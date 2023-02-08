@@ -17,24 +17,9 @@ plot_graph = False
 
 
 # directory containing all the npy files
-feature_folder = "preprocessed/mfcc_svm"
+feature_folder = "preprocessed/mfcc"
 label_folder = "preprocessed/label"
-# get a list of all npy files in the folder
-files = [f for f in os.listdir(feature_folder) if f.endswith(".npy")]
-# save all npy into one X.
-# if not os.path.exists("preprocessed/X.npy"):
-#     # initialize the X array
-#     X = np.empty(shape=[1, 50])
-#     # iterate through the list of npy files
-#     for file in tqdm(files):
-#         # load the npy file
-#         mfcc_feature = np.load(os.path.join(feature_folder, file))
-#         # append the mfcc feature to the X array
-#         X = np.append(X, mfcc_feature, axis=0)
-#     X = X[1:]
-#     np.save("preprocessed/X", X)
-# else:
-#     X = np.load("preprocessed/X.npy", allow_pickle=True)
+# load mean MFCC feature
 X = np.load("preprocessed/mfcc_svm/mfcc_svm.npy", allow_pickle=True)
 # load y_all
 y_all = np.load(os.path.join(label_folder, "label.npy"), allow_pickle=True)

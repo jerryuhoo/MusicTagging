@@ -13,21 +13,15 @@ def extract_mfcc(y, sr, n_mfcc):
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
     return mfcc
 
-def extract_mfcc_mean(y, sr, n_mfcc):
-    mfcc = extract_mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
+def extract_mfcc_mean(mfcc):
     mean_mean = np.mean(mfcc, axis=1)
-    # var_features = np.var(mfcc, axis=1)
-
-    # input_features = np.concatenate((mean_features, var_features))
-    # print(mean_mean.shape)
-    # Reshape the feature into 2-dimensional array
-    # input_features = input_features.reshape(-1, 50)
     return mean_mean
 
 def preprocess_data(song_dir, csv_dir, save_dir):
     os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "mfcc_svm"), exist_ok=True)
+    os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
     X = []  # mfcc
+    X_mean = []  # mfcc mean
     y = []  # label
 
     sr = 16000
@@ -60,12 +54,10 @@ def preprocess_data(song_dir, csv_dir, save_dir):
                 segment = x[i:end]
 
                 # store the segment in the list
-                feats = extract_mfcc_mean(y=segment, sr=sr, n_mfcc=25)
-                # np.save(
-                #     os.path.join(save_dir, "mfcc_original", audio_name + "_" + str(seg_count) + ".npy"),
-                #     mfcc,
-                # )
+                feats = extract_mfcc(y=segment, sr=sr, n_mfcc=25)
+                feats_mean = extract_mfcc_mean(feats)
                 X.append(feats)
+                X_mean.append(feats_mean)
         except Exception:
             print("error: {}".format(audio_path))
 
@@ -80,9 +72,10 @@ def preprocess_data(song_dir, csv_dir, save_dir):
 
     y = np.array(y)
     X = np.array(X)
-    
+    X_mean = np.array(X_mean)
     np.save(os.path.join(save_dir, "label", "label.npy"), y)
-    np.save(os.path.join(save_dir, "mfcc_svm", "mfcc_svm.npy"), X)
+    np.save(os.path.join(save_dir, "mfcc", "mfcc_svm.npy"), X_mean)
+    np.save(os.path.join(save_dir, "mfcc", "mfcc.npy"), X)
     # X = np.array(X)
     # Normalize the features
     # X_mean = np.mean(X, axis=0)

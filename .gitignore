@@ -2,3 +2,4 @@ preprocessed/
 *.npy
 *.joblib
 *.pyc
+models/
