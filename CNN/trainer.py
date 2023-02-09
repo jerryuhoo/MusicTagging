@@ -4,10 +4,12 @@ import torch.optim as optim
 import numpy as np
 from torch.utils.data import DataLoader
 import os
+import time
 from dataset import MusicTaggingDataset
 from cnn import CNN
 from tqdm import tqdm
-import tensorboardX
+from torch.utils.data import Subset
+from torch.utils.tensorboard import SummaryWriter
 
 
 def load_best_model(model, path):
@@ -20,7 +22,6 @@ def load_best_model(model, path):
             best_epoch = epoch
             best_model_path = os.path.join(path, m)
     return best_model_path
-
 
 def resume_training(model, optimizer, model_path, epoch=0):
     if model_path is not None and os.path.isfile(model_path):
@@ -37,7 +38,6 @@ def resume_training(model, optimizer, model_path, epoch=0):
 
     return model, optimizer, epoch, loss
 
-
 def save_checkpoint(model, epoch, model_path):
     torch.save(
         {
@@ -49,17 +49,52 @@ def save_checkpoint(model, epoch, model_path):
         model_path,
     )
 
+def check_device():
+    if torch.cuda.is_available():
+        print("Using GPU for training.")
+        device = torch.device("cuda")
+    else:
+        print("Using CPU for training.")
+        device = torch.device("cpu")
+    return device
 
-if torch.cuda.is_available():
-    print("Using GPU for training.")
-    device = torch.device("cuda")
-else:
-    print("Using CPU for training.")
-    device = torch.device("cpu")
+device = check_device()
 
+# Define the hyperparameters
+num_classes = 50
+batch_size = 128
+num_epochs = 1000
+saved_models_count = 0
+max_models_saved = 5
+save_interval = 5
+learning_rate = 0.001
+feats = "log_mel"
+if feats == "mfcc":
+    input_dim = 25
+if feats == "log_mel":
+    input_dim = 128
 
-# load CNN model
-model = CNN(input_dim=25, num_classes=50)
+# Load dataset
+folder_path = "preprocessed"
+dataset = MusicTaggingDataset(folder_path=folder_path, feats_type=feats)
+
+# Define the indices for the train, validation, and test sets
+num_data = len(dataset)
+indices = list(range(num_data))
+split = [int(0.8 * num_data), int(0.9 * num_data), num_data]
+train_indices, val_indices, test_indices = indices[:split[0]], indices[split[0]:split[1]], indices[split[1]:]
+
+# Create the train, validation, and test datasets using the Subset class
+train_dataset = Subset(dataset, train_indices)
+val_dataset = Subset(dataset, val_indices)
+test_dataset = Subset(dataset, test_indices)
+print("train:", len(train_dataset))
+print("val:", len(val_dataset))
+print("test:", len(test_dataset))
+
+# Load CNN model
+print("num_classes", num_classes)
+model = CNN(input_dim=input_dim, num_classes=num_classes)
 model = model.to(device)
 print(model)
 
@@ -67,64 +102,29 @@ print(model)
 criterion = nn.BCELoss()
 
 # Define the optimizer
-optimizer = optim.AdamW(model.parameters(), lr=0.001)
+optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 
+# Resume training
 model_path = "models/CNN"
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
 model, optimizer, start_epoch, loss = resume_training(model, optimizer, best_model_path)
 
-
-# Load data
-mfcc_folder = "preprocessed/mfcc"
-label_folder = "preprocessed/label"
-
-# a list of MFCC features, each of shape (num_frames, num_mfcc_coeffs)
-mfcc_features = np.load(os.path.join(mfcc_folder, "mfcc.npy"), allow_pickle=True)
-print("mfcc_features.shape", mfcc_features.shape)
-
-# a list of multi-labels, each of shape (num_labels,)
-multi_labels = np.load(os.path.join(label_folder, "label.npy"), allow_pickle=True)
-print("multi_labels.shape", multi_labels.shape)
-
-
-# Combine the MFCC features and multi-labels into a list of tuples
-data_list = [(mfcc_features[i], multi_labels[i]) for i in range(len(mfcc_features))]
-train_size = int(0.7 * len(data_list))
-val_size = int(0.2 * len(data_list))
-test_size = len(data_list) - train_size - val_size
-data_list_train, data_list_val, data_list_test = torch.utils.data.random_split(
-    data_list, [train_size, val_size, test_size]
-)
-print("train:", len(data_list_train))
-print("val:", len(data_list_val))
-print("test:", len(data_list_test))
-# Load dataset
-dataset_train = MusicTaggingDataset(data_list_train)
-dataset_val = MusicTaggingDataset(data_list_val)
-dataset_test = MusicTaggingDataset(data_list_test)
-
 # Initialize the TensorBoard writer
-writer = tensorboardX.SummaryWriter(model_path)
-
-# Define the batch size
-batch_size = 32
+writer = SummaryWriter(log_dir=model_path)
+# writer_eval = SummaryWriter(log_dir=os.path.join(model_path, "eval"))
 
 # Define the data loader
 train_loader = DataLoader(
-    dataset_train, batch_size=batch_size, shuffle=True, num_workers=2
+    train_dataset, batch_size=batch_size, shuffle=False, num_workers=2
 )
-val_loader = DataLoader(dataset_val, batch_size=batch_size, shuffle=True, num_workers=2)
+val_loader = DataLoader(
+    val_dataset, batch_size=batch_size, shuffle=False, num_workers=2
+)
 test_loader = DataLoader(
-    dataset_test, batch_size=batch_size, shuffle=True, num_workers=2
+    test_dataset, batch_size=batch_size, shuffle=False, num_workers=2
 )
-
-# Define the number of training epochs
-num_epochs = 1000
-saved_models_count = 0
-max_models_saved = 5
-save_interval = 5
 
 # Train the model
 for epoch in range(start_epoch, num_epochs):
@@ -149,9 +149,19 @@ for epoch in range(start_epoch, num_epochs):
         # )
     training_acc = correct / total
     training_loss /= len(train_loader)
-    writer.add_scalar("Training Loss", training_loss, epoch + 1)
-    writer.add_scalar("Training Accuracy", training_acc, epoch + 1)
-    print(f"Epoch {epoch + 1} loss: {training_loss}, Train Accuracy: {training_acc}")
+    writer.add_scalar(
+        "train/Loss",
+        training_loss,
+        epoch + 1,
+        walltime=time.time(),
+    )
+    writer.add_scalar(
+        "train/Accuracy",
+        training_acc,
+        epoch + 1,
+        walltime=time.time(),
+    )
+    print(f"Epoch {epoch + 1} Loss: {training_loss}, Accuracy: {training_acc}")
 
     if (epoch + 1) % save_interval == 0:
         # validation
@@ -172,8 +182,18 @@ for epoch in range(start_epoch, num_epochs):
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
-            writer.add_scalar("Validation Loss", val_loss, epoch + 1)
-            writer.add_scalar("Validation Accuracy", val_acc, epoch + 1)
+            writer.add_scalar(
+                "val/Loss",
+                val_loss,
+                epoch + 1,
+                walltime=time.time(),
+            )
+            writer.add_scalar(
+                "val/Accuracy",
+                val_acc,
+                epoch + 1,
+                walltime=time.time(),
+            )
         # save model
         if saved_models_count < max_models_saved:
             model_file = os.path.join(

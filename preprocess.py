@@ -14,10 +14,12 @@ if stage == 0:
     perform_label_reduction(directory_labels)
     plot_histogram(directory_labels, "annotations_final_new.csv")
 
+song_dir = "../data/magnatagatune/wav/"
+csv_dir = "../data/magnatagatune/annotations_final_new.csv"
+save_dir = "preprocessed"
+os.makedirs(save_dir, exist_ok=True)
+
 if stage <= 1:
     # extract mfcc and labels, save them to numpy files.
-    song_dir = "../data/magnatagatune/wav/"
-    csv_dir = "../data/magnatagatune/annotations_final_new.csv"
-    save_dir = "preprocessed"
-    os.makedirs(save_dir, exist_ok=True)
     preprocess_data(song_dir, csv_dir, save_dir)
+
