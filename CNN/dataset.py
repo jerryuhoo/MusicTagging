@@ -4,18 +4,10 @@ import numpy as np
 import os
 
 class MusicTaggingDataset(Dataset):
-    def __init__(self, folder_path, feats_type):
-        self.folder_path = folder_path
-        self.feats_type = feats_type
-        self.label_list = []
-        self.feats_list = []
-        for filename in os.listdir(os.path.join(self.folder_path, "label")):
-            if filename.endswith(".npy"):
-                 self.label_list.append(os.path.join(self.folder_path, "label", filename))
-        for filename in os.listdir(os.path.join(self.folder_path, self.feats_type)):
-            if filename.endswith(".npy"):
-                 self.feats_list.append(os.path.join(self.folder_path, self.feats_type, filename))
-
+    def __init__(self, label_list, feats_list):
+        self.label_list = label_list
+        self.feats_list = feats_list
+        
     def __len__(self):
         return len(self.label_list)
 

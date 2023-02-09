@@ -62,7 +62,7 @@ device = check_device()
 
 # Define the hyperparameters
 num_classes = 50
-batch_size = 128
+batch_size = 32
 num_epochs = 1000
 saved_models_count = 0
 max_models_saved = 5
@@ -75,8 +75,17 @@ if feats == "log_mel":
     input_dim = 128
 
 # Load dataset
+label_list = []
+feats_list = []
 folder_path = "preprocessed"
-dataset = MusicTaggingDataset(folder_path=folder_path, feats_type=feats)
+for filename in os.listdir(os.path.join(folder_path, "label")):
+    if filename.endswith(".npy"):
+        label_list.append(os.path.join(folder_path, "label", filename))
+for filename in os.listdir(os.path.join(folder_path, feats)):
+    if filename.endswith(".npy"):
+        feats_list.append(os.path.join(folder_path, feats, filename))
+
+dataset = MusicTaggingDataset(label_list, feats_list)
 
 # Define the indices for the train, validation, and test sets
 num_data = len(dataset)
