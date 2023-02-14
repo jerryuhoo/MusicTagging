@@ -11,64 +11,31 @@ from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
 
+import sys
 
-def load_best_model(model, path):
-    models = [f for f in os.listdir(path) if f.endswith(".pt")]
-    best_epoch = 0
-    best_model_path = None
-    for m in models:
-        epoch = int(m.split("_")[-1].split(".")[0])
-        if epoch > best_epoch:
-            best_epoch = epoch
-            best_model_path = os.path.join(path, m)
-    return best_model_path
+sys.path.append(".")
+from utils import (
+    load_best_model,
+    resume_training,
+    save_checkpoint,
+    check_device,
+    compute_confusion_matrix,
+    log_confusion_matrix,
+)
 
-def resume_training(model, optimizer, model_path, epoch=0):
-    if model_path is not None and os.path.isfile(model_path):
-        print(f"Loading checkpoint '{model_path}'")
-        checkpoint = torch.load(model_path)
-        epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        loss = checkpoint["loss"]
-        print(f"Checkpoint loaded. Resuming training from epoch {epoch}")
-    else:
-        loss = None
-        print(f"No checkpoint found, Starting training from scratch")
-
-    return model, optimizer, epoch, loss
-
-def save_checkpoint(model, epoch, model_path):
-    torch.save(
-        {
-            "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "loss": loss,
-        },
-        model_path,
-    )
-
-def check_device():
-    if torch.cuda.is_available():
-        print("Using GPU for training.")
-        device = torch.device("cuda")
-    else:
-        print("Using CPU for training.")
-        device = torch.device("cpu")
-    return device
 
 device = check_device()
 
 # Define the hyperparameters
 num_classes = 50
 batch_size = 32
-num_epochs = 1000
+num_epochs = 100
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
 learning_rate = 0.001
-feats = "log_mel"
+num_workers = 4
+feats = "mfcc"
 if feats == "mfcc":
     input_dim = 25
 if feats == "log_mel":
@@ -81,9 +48,7 @@ folder_path = "preprocessed"
 for filename in os.listdir(os.path.join(folder_path, "label")):
     if filename.endswith(".npy"):
         label_list.append(os.path.join(folder_path, "label", filename))
-for filename in os.listdir(os.path.join(folder_path, feats)):
-    if filename.endswith(".npy"):
-        feats_list.append(os.path.join(folder_path, feats, filename))
+        feats_list.append(os.path.join(folder_path, feats, feats + filename[5:]))
 
 dataset = MusicTaggingDataset(label_list, feats_list)
 
@@ -91,7 +56,11 @@ dataset = MusicTaggingDataset(label_list, feats_list)
 num_data = len(dataset)
 indices = list(range(num_data))
 split = [int(0.8 * num_data), int(0.9 * num_data), num_data]
-train_indices, val_indices, test_indices = indices[:split[0]], indices[split[0]:split[1]], indices[split[1]:]
+train_indices, val_indices, test_indices = (
+    indices[: split[0]],
+    indices[split[0] : split[1]],
+    indices[split[1] :],
+)
 
 # Create the train, validation, and test datasets using the Subset class
 train_dataset = Subset(dataset, train_indices)
@@ -126,13 +95,25 @@ writer = SummaryWriter(log_dir=model_path)
 
 # Define the data loader
 train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=False, num_workers=2
+    train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    num_workers=num_workers,
+    pin_memory=True,
 )
 val_loader = DataLoader(
-    val_dataset, batch_size=batch_size, shuffle=False, num_workers=2
+    val_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=num_workers,
+    pin_memory=True,
 )
 test_loader = DataLoader(
-    test_dataset, batch_size=batch_size, shuffle=False, num_workers=2
+    test_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=num_workers,
+    pin_memory=True,
 )
 
 # Train the model
@@ -203,12 +184,14 @@ for epoch in range(start_epoch, num_epochs):
                 epoch + 1,
                 walltime=time.time(),
             )
+            confusion_matrix = compute_confusion_matrix(val_outputs, val_labels)
+            log_confusion_matrix(writer, confusion_matrix, i)
         # save model
         if saved_models_count < max_models_saved:
             model_file = os.path.join(
                 model_path, "model_epoch_{}.pt".format((epoch + 1))
             )
-            save_checkpoint(model, epoch + 1, model_file)
+            save_checkpoint(model, epoch + 1, model_file, optimizer, val_loss)
             saved_models_count += 1
         else:
             # Remove the oldest saved model
@@ -223,7 +206,7 @@ for epoch in range(start_epoch, num_epochs):
             model_file = os.path.join(
                 model_path, "model_epoch_{}.pt".format((epoch + 1))
             )
-            save_checkpoint(model, epoch + 1, model_file)
+            save_checkpoint(model, epoch + 1, model_file, optimizer, val_loss)
         model.train()
 
 # Close the TensorBoard writer
