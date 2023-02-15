@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
 import numpy as np
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import os
 import time
-from dataset import MusicTaggingDataset
+from dataset import HDF5Dataset, HDF5DataLoader
 from cnn import CNN
 from tqdm import tqdm
 from torch.utils.data import Subset
@@ -35,40 +36,26 @@ max_models_saved = 5
 save_interval = 5
 learning_rate = 0.001
 num_workers = 4
-feats = "mfcc"
-if feats == "mfcc":
+feature_type = "mfcc"
+if feature_type == "mfcc":
     input_dim = 25
-if feats == "log_mel":
+if feature_type == "log_mel":
     input_dim = 128
 
-# Load dataset
-label_list = []
-feats_list = []
-folder_path = "preprocessed"
-for filename in os.listdir(os.path.join(folder_path, "label")):
-    if filename.endswith(".npy"):
-        label_list.append(os.path.join(folder_path, "label", filename))
-        feats_list.append(os.path.join(folder_path, feats, feats + filename[5:]))
+dataset = HDF5Dataset("preprocessed/mfcc.h5", "preprocessed/label.h5", feature_type=feature_type)
+train_ratio = 0.8
+val_ratio = 0.1
+test_ratio = 0.1
+total_len = len(dataset)
+train_len = int(total_len * train_ratio)
+val_len = int(total_len * val_ratio)
+test_len = total_len - train_len - val_len
+print("train_len", train_len)
+print("val_len", val_len)
+print("test_len", test_len)
+train_dataset, val_dataset, test_dataset = random_split(dataset, [train_len, val_len, test_len])
 
-dataset = MusicTaggingDataset(label_list, feats_list)
-
-# Define the indices for the train, validation, and test sets
-num_data = len(dataset)
-indices = list(range(num_data))
-split = [int(0.8 * num_data), int(0.9 * num_data), num_data]
-train_indices, val_indices, test_indices = (
-    indices[: split[0]],
-    indices[split[0] : split[1]],
-    indices[split[1] :],
-)
-
-# Create the train, validation, and test datasets using the Subset class
-train_dataset = Subset(dataset, train_indices)
-val_dataset = Subset(dataset, val_indices)
-test_dataset = Subset(dataset, test_indices)
-print("train:", len(train_dataset))
-print("val:", len(val_dataset))
-print("test:", len(test_dataset))
+train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=8)
 
 # Load CNN model
 print("num_classes", num_classes)
@@ -92,29 +79,6 @@ model, optimizer, start_epoch, loss = resume_training(model, optimizer, best_mod
 # Initialize the TensorBoard writer
 writer = SummaryWriter(log_dir=model_path)
 # writer_eval = SummaryWriter(log_dir=os.path.join(model_path, "eval"))
-
-# Define the data loader
-train_loader = DataLoader(
-    train_dataset,
-    batch_size=batch_size,
-    shuffle=True,
-    num_workers=num_workers,
-    pin_memory=True,
-)
-val_loader = DataLoader(
-    val_dataset,
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=num_workers,
-    pin_memory=True,
-)
-test_loader = DataLoader(
-    test_dataset,
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=num_workers,
-    pin_memory=True,
-)
 
 # Train the model
 for epoch in range(start_epoch, num_epochs):

@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 import pandas as pd
-
+import h5py
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -18,7 +18,15 @@ def extract_mfcc_mean(mfcc):
     return mean_mean
 
 def extract_log_mel(y, sr, n_mels=128, fmin=20, fmax=8000, n_fft=2048, hop_length=512):
-    mel_spec = librosa.feature.melspectrogram(y, sr=sr, n_mels=n_mels, fmin=fmin, fmax=fmax, n_fft=n_fft, hop_length=hop_length)
+    mel_spec = librosa.feature.melspectrogram(
+        y,
+        sr=sr,
+        n_mels=n_mels,
+        fmin=fmin,
+        fmax=fmax,
+        n_fft=n_fft,
+        hop_length=hop_length,
+    )
     log_mel_spec = librosa.power_to_db(mel_spec)
     return log_mel_spec
 
@@ -48,7 +56,7 @@ def preprocess_data(song_dir, csv_dir, save_dir):
             # pad zero
             pad_length = 30 * sr - len(x)
             x = np.pad(x, (0, pad_length), mode="constant", constant_values=0)
-            for i in range(0, len(x) - window_length + 1, step):   
+            for i in range(0, len(x) - window_length + 1, step):
                 # get the current segment
                 end = i + window_length if i + window_length < len(x) else len(x)
                 segment = x[i:end]
@@ -71,10 +79,9 @@ def preprocess_data(song_dir, csv_dir, save_dir):
         except Exception:
             print("error: {}".format(audio_path))
 
-    
     # if feats_type == "log_mel":
     #     np.save(os.path.join(save_dir, "log_mel", "log_mel.npy"), X)
-    
+
     # X = np.array(X)
     # Normalize the features
     # X_mean = np.mean(X, axis=0)
@@ -94,3 +101,23 @@ def preprocess_data(song_dir, csv_dir, save_dir):
     X_new = (X_new - mean) / var
     """
     return None
+
+def create_hdf5_dataset(data_dir, save_dir, dataset_name, batch_size):
+    # Get a list of filenames sorted alphabetically
+    filenames = sorted(os.listdir(data_dir))
+
+    # Determine the shape of the data
+    shape = np.load(os.path.join(data_dir, filenames[0])).shape
+    dataset_shape = (len(filenames),) + shape
+
+    # Create the HDF5 file
+    with h5py.File(os.path.join(save_dir, f"{dataset_name}.h5"), "w") as f:
+        dataset = f.create_dataset(dataset_name, shape=dataset_shape, dtype='float32')
+
+        # Iterate over the files and add the data to the dataset
+        for i in range(0, len(filenames), batch_size):
+            batch_filenames = filenames[i:i+batch_size]
+            batch_data = [np.load(os.path.join(data_dir, filename)) for filename in tqdm(batch_filenames)]
+            dataset[i:i+len(batch_data)] = batch_data
+
+    return dataset_shape
