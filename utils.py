@@ -62,22 +62,25 @@ def compute_confusion_matrix(y_pred, y_true):
     fp = ((1 - y_true) * y_pred).sum(dim=0)
     fn = (y_true * (1 - y_pred)).sum(dim=0)
     tn = ((1 - y_true) * (1 - y_pred)).sum(dim=0)
-    # return torch.stack([tp, fp, fn, tn], dim=1)
     return torch.stack([tp, fp, fn, tn], dim=1)
 
 
 def log_confusion_matrix(writer, confusion_matrix, epoch):
-    # for i in range(confusion_matrix.shape[0]):
-    #     tp = confusion_matrix[i, 0]
-    #     fp = confusion_matrix[i, 1]
-    #     fn = confusion_matrix[i, 2]
-    #     tn = confusion_matrix[i, 3]
-    #     precision = tp / (tp + fp)
-    #     recall = tp / (tp + fn)
-    #     f1 = 2 * precision * recall / (precision + recall)
-    #     writer.add_scalar(f'class_{i}/precision', precision, epoch)
-    #     writer.add_scalar(f'class_{i}/recall', recall, epoch)
-    #     writer.add_scalar(f'class_{i}/f1', f1, epoch)
+    for i in range(confusion_matrix.shape[0]):
+        tp = confusion_matrix[i, 0]
+        fp = confusion_matrix[i, 1]
+        fn = confusion_matrix[i, 2]
+        tn = confusion_matrix[i, 3]
+        # print("tp",tp)
+        # print("fp",fp)
+        # print("fn",fn)
+        # print("tn",tn)
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        f1 = 2 * precision * recall / (precision + recall)
+        writer.add_scalar(f"class_{i}/precision", precision, epoch)
+        writer.add_scalar(f"class_{i}/recall", recall, epoch)
+        writer.add_scalar(f"class_{i}/f1", f1, epoch)
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
     # print("confusion_matrix",confusion_matrix)
     fig = plt.figure(figsize=(6, 6))

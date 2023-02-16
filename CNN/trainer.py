@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, random_split
 import os
 import time
 from dataset import HDF5Dataset, HDF5DataLoader
-from cnn import CNN
+from cnn import CRNN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
@@ -30,19 +30,26 @@ device = check_device()
 # Define the hyperparameters
 num_classes = 50
 batch_size = 32
-num_epochs = 100
+num_epochs = 20
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
 learning_rate = 0.001
-num_workers = 4
-feature_type = "mfcc"
+num_workers = 8
+feature_type = "log_mel"
 if feature_type == "mfcc":
     input_dim = 25
+    feature_h5_path = "preprocessed/mfcc.h5"
 if feature_type == "log_mel":
     input_dim = 128
+    feature_h5_path = "preprocessed/log_mel.h5"
 
-dataset = HDF5Dataset("preprocessed/mfcc.h5", "preprocessed/label.h5", feature_type=feature_type)
+
+dataset = HDF5Dataset(
+    feature_h5_path=feature_h5_path,
+    label_h5_path="preprocessed/label.h5",
+    feature_type=feature_type,
+)
 train_ratio = 0.8
 val_ratio = 0.1
 test_ratio = 0.1
@@ -53,13 +60,17 @@ test_len = total_len - train_len - val_len
 print("train_len", train_len)
 print("val_len", val_len)
 print("test_len", test_len)
-train_dataset, val_dataset, test_dataset = random_split(dataset, [train_len, val_len, test_len])
+train_dataset, val_dataset, test_dataset = random_split(
+    dataset, [train_len, val_len, test_len]
+)
 
-train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=8)
-
-# Load CNN model
+train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=num_workers)
+val_loader = HDF5DataLoader(val_dataset, batch_size=32, num_workers=num_workers)
+# Load model
 print("num_classes", num_classes)
-model = CNN(input_dim=input_dim, num_classes=num_classes)
+model = CRNN(
+    sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=96, n_class=50
+)
 model = model.to(device)
 print(model)
 
@@ -96,8 +107,9 @@ for epoch in range(start_epoch, num_epochs):
         optimizer.step()
         training_loss += loss.item()
 
-        total += labels.size(0)
+        total += labels.numel()
         correct += (outputs.round() == labels).sum().item()
+
         # writer.add_scalar(
         #     "Training Loss", training_loss, (epoch + 1) * len(train_loader) + i
         # )
@@ -124,6 +136,7 @@ for epoch in range(start_epoch, num_epochs):
             model.eval()
             correct = 0
             total = 0
+            confusion_matrix = torch.zeros((num_classes, 4)).to(device)
             for val_data in val_loader:
                 val_inputs, val_labels = val_data
                 val_inputs = val_inputs.to(device)
@@ -131,8 +144,12 @@ for epoch in range(start_epoch, num_epochs):
                 val_outputs = model(val_inputs)
                 loss = criterion(val_outputs, val_labels)
                 val_loss += loss.item()
-                total += val_labels.size(0)
+                total += val_labels.numel()
                 correct += (val_outputs.round() == val_labels).sum().item()
+                batch_confusion_matrix = compute_confusion_matrix(
+                    val_outputs, val_labels
+                )
+                confusion_matrix += batch_confusion_matrix
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
@@ -148,8 +165,7 @@ for epoch in range(start_epoch, num_epochs):
                 epoch + 1,
                 walltime=time.time(),
             )
-            confusion_matrix = compute_confusion_matrix(val_outputs, val_labels)
-            log_confusion_matrix(writer, confusion_matrix, i)
+            log_confusion_matrix(writer, confusion_matrix, epoch + 1)
         # save model
         if saved_models_count < max_models_saved:
             model_file = os.path.join(

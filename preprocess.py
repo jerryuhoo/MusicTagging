@@ -24,5 +24,12 @@ if stage <= 1:
     preprocess_data(song_dir, csv_dir, save_dir)
 
 if stage <= 2:
-    create_hdf5_dataset(save_dir + "mfcc", save_dir, "mfcc", 50000)
-    create_hdf5_dataset(save_dir + "label", save_dir, "label", 50000) 
+    if not os.path.exists(save_dir + "mfcc.h5"):
+        print("creating mfcc.h5")
+        create_hdf5_dataset(save_dir + "mfcc", save_dir, "mfcc", 50000)
+    if not os.path.exists(save_dir + "label.h5"):
+        print("creating label.h5")
+        create_hdf5_dataset(save_dir + "label", save_dir, "label", 50000)
+    if not os.path.exists(save_dir + "log_mel.h5"):
+        print("creating log_mel.h5")
+        create_hdf5_dataset(save_dir + "log_mel", save_dir, "log_mel", 10000)
