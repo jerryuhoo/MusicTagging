@@ -11,7 +11,6 @@ from cnn import CRNN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
-
 import sys
 
 sys.path.append(".")
@@ -30,7 +29,7 @@ device = check_device()
 # Define the hyperparameters
 num_classes = 50
 batch_size = 32
-num_epochs = 20
+num_epochs = 100
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
@@ -110,9 +109,6 @@ for epoch in range(start_epoch, num_epochs):
         total += labels.numel()
         correct += (outputs.round() == labels).sum().item()
 
-        # writer.add_scalar(
-        #     "Training Loss", training_loss, (epoch + 1) * len(train_loader) + i
-        # )
     training_acc = correct / total
     training_loss /= len(train_loader)
     writer.add_scalar(

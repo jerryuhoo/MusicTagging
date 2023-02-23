@@ -71,16 +71,30 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
         fp = confusion_matrix[i, 1]
         fn = confusion_matrix[i, 2]
         tn = confusion_matrix[i, 3]
-        # print("tp",tp)
-        # print("fp",fp)
-        # print("fn",fn)
-        # print("tn",tn)
         precision = tp / (tp + fp)
         recall = tp / (tp + fn)
         f1 = 2 * precision * recall / (precision + recall)
         writer.add_scalar(f"class_{i}/precision", precision, epoch)
         writer.add_scalar(f"class_{i}/recall", recall, epoch)
         writer.add_scalar(f"class_{i}/f1", f1, epoch)
+
+    tp_sum = torch.sum(confusion_matrix[:, 0], dim=0)
+    fp_sum = torch.sum(confusion_matrix[:, 1], dim=0)
+    fn_sum = torch.sum(confusion_matrix[:, 2], dim=0)
+    tn_sum = torch.sum(confusion_matrix[:, 3], dim=0)
+    precision_sum = tp_sum / (tp_sum + fp_sum)
+    recall_sum = tp_sum / (tp_sum + fn_sum)
+    f1_sum = 2 * precision_sum * recall_sum / (precision_sum + recall_sum)
+    roc_auc = calculate_roc_auc(
+        confusion_matrix[:, 0],
+        confusion_matrix[:, 1],
+        confusion_matrix[:, 2],
+        confusion_matrix[:, 3],
+    )
+    writer.add_scalar(f"val/precision", precision_sum, epoch)
+    writer.add_scalar(f"val/recall", recall_sum, epoch)
+    writer.add_scalar(f"val/f1", f1_sum, epoch)
+    writer.add_scalar(f"val/roc_auc", roc_auc, epoch)
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
     # print("confusion_matrix",confusion_matrix)
     fig = plt.figure(figsize=(6, 6))
@@ -93,3 +107,14 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     image_tensor = torch.from_numpy(image).permute(2, 0, 1)
     writer.add_image("Confusion matrix", image_tensor, epoch)
+    print(f"precision: {precision_sum}, recall: {recall_sum}")
+    print(f"f1: {f1_sum}, roc_auc: {roc_auc}")
+
+
+def calculate_roc_auc(tp, fp, fn, tn):
+    tpr = tp / (tp + fn)
+    fpr = fp / (fp + tn)
+    thresholds, indices = torch.sort(fpr)
+    tpr = tpr[indices]
+    area = torch.trapz(tpr, thresholds)
+    return area.item()
