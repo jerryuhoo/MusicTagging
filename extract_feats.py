@@ -6,6 +6,8 @@ import pandas as pd
 import h5py
 import warnings
 import multiprocessing
+from memory_profiler import profile, memory_usage
+
 
 warnings.filterwarnings("ignore")
 
@@ -32,32 +34,36 @@ def extract_log_mel(y, sr, n_mels=128, fmin=20, fmax=8000, n_fft=2048, hop_lengt
     return log_mel_spec
 
 def preprocess_segment(args):
-    i, audio_data, row_idx, seg_count, sr, window_length, step, label_names, row, save_dir = args
-    pad_length = 30 * sr - len(audio_data)
-    x = np.pad(audio_data, (0, pad_length), mode="constant", constant_values=0)
-    segment_list = []
-    for i in range(0, len(x) - window_length + 1, step):
-        # get the current segment
-        end = i + window_length if i + window_length < len(x) else len(x)
-        segment = x[i:end]
-        segment_list.append(segment)
-    for idx, segment in enumerate(segment_list):
-        mfcc = extract_mfcc(y=segment, sr=sr, n_mfcc=25)
-        mfcc_mean = extract_mfcc_mean(mfcc)
-        log_mel = extract_log_mel(y=segment, sr=sr)
-        y = []
-        for col_idx, label_name in enumerate(label_names):
-            if label_name == "mp3_path" or label_name == "features_id":
-                continue
-            # Extract label
-            label = row[col_idx]
-            y.append(label)
-        np.save(os.path.join(save_dir, "label", f"label_{row_idx}_{seg_count + idx}.npy"), np.array(y))
-        np.save(os.path.join(save_dir, "mfcc", f"mfcc_{row_idx}_{seg_count + idx}.npy"), mfcc)
-        np.save(os.path.join(save_dir, "mfcc_mean", f"mfcc_mean_{row_idx}_{seg_count + idx}.npy"), mfcc_mean)
-        np.save(os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_count + idx}.npy"), log_mel)
+    # i, audio_data, row_idx, seg_count, sr, window_length, step, row, save_dir = args
+    song_dir, row_idx, row, seg_idx, sr, window_length, step, save_dir = args
+    audio_path = os.path.join(song_dir, row["mp3_path"])[:-4] + ".mp3"
+    base_name = os.path.basename(audio_path)
+    audio_name = base_name.split(".")[0]
+    seg_count = 0
+    try:
+        audio_data, _ = librosa.load(audio_path, sr=sr)
+    
+        pad_length = 30 * sr - len(audio_data)
+        x = np.pad(audio_data, (0, pad_length), mode="constant", constant_values=0)
+        segment_list = []
+        for i in range(0, len(x) - window_length + 1, step):
+            # get the current segment
+            end = i + window_length if i + window_length < len(x) else len(x)
+            segment = x[i:end]
+            segment_list.append(segment)
+        for idx, segment in enumerate(segment_list):
+            mfcc = extract_mfcc(y=segment, sr=sr, n_mfcc=25)
+            mfcc_mean = extract_mfcc_mean(mfcc)
+            log_mel = extract_log_mel(y=segment, sr=sr)
+            y = np.array(list(row["features_id"].split("_")[0]), dtype=int)
+            np.save(os.path.join(save_dir, "label", f"label_{row_idx}_{seg_count + idx}.npy"), np.array(y))
+            np.save(os.path.join(save_dir, "mfcc", f"mfcc_{row_idx}_{seg_count + idx}.npy"), mfcc)
+            np.save(os.path.join(save_dir, "mfcc_mean", f"mfcc_mean_{row_idx}_{seg_count + idx}.npy"), mfcc_mean)
+            np.save(os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_count + idx}.npy"), log_mel)
+    except Exception:
+        print("error: {}".format(audio_path))
 
-def preprocess_data(song_dir, csv_dir, save_dir):
+def preprocess_data(song_dir, csv_dir, save_dir, n_workers=2):
     os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
@@ -67,24 +73,42 @@ def preprocess_data(song_dir, csv_dir, save_dir):
     total_length = 30 * sr
     window_length = 10 * sr
     step = 5 * sr
+    seg_count = (30 - 5) // 5
 
     # load csv
     df = pd.read_csv(csv_dir, sep="\t")
-    label_names = df.columns.values
-    pool = multiprocessing.Pool(processes=2)
+    df = df.iloc[:, -2:]
+    pool = multiprocessing.Pool(processes=n_workers)
     results = []
+    
+    # for row_idx, row in tqdm(df.iterrows(), total=df.shape[0]):
+    #     # print("Memory usage:", memory_usage()[0])
+    #     try:
+    #         audio_path = os.path.join(song_dir, row["mp3_path"])[:-4] + ".mp3"
+    #         base_name = os.path.basename(audio_path)
+    #         audio_name = base_name.split(".")[0]
+    #         seg_count = 0
+    #         audio_data, _ = librosa.load(audio_path, sr=sr)
+    #         args_list = [(i, audio_data, row_idx, seg_count, sr, window_length, step, row, save_dir) for i in range(0, len(audio_data) - window_length + 1, step)]
+    #         # results.append(pool.map_async(preprocess_segment, args_list))
+    #         pool.map_async(preprocess_segment, args_list)
+    #         seg_count += len(args_list)
+    #     except Exception:
+    #         print("error: {}".format(audio_path))
+
+
+    args_list = []
     for row_idx, row in tqdm(df.iterrows(), total=df.shape[0]):
-        audio_path = os.path.join(song_dir, row["mp3_path"])[:-4] + ".mp3"
-        base_name = os.path.basename(audio_path)
-        audio_name = base_name.split(".")[0]
-        seg_count = 0
-        try:
-            audio_data, _ = librosa.load(audio_path, sr=sr)
-            args_list = [(i, audio_data, row_idx, seg_count, sr, window_length, step, label_names, row, save_dir) for i in range(0, len(audio_data) - window_length + 1, step)]
-            results.append(pool.map_async(preprocess_segment, args_list))
-            seg_count += len(args_list)
-        except Exception:
-            print("error: {}".format(audio_path))
+        for seg_idx in range(seg_count):
+            args_list.append((song_dir, row_idx, row, seg_idx, sr, window_length, step, save_dir))
+            pool.map_async(preprocess_segment, args_list)
+
+    # with multiprocessing.Pool(processes=n_workers) as pool:
+    #     pool.map_async(preprocess_segment, args_list).get()
+    #     pool.close()
+    #     pool.join()
+        # mem_usage_end = memory_usage()[0]
+        # print("Memory usage:", mem_usage_end - mem_usage_start, "MB")
     pool.close()
     pool.join()
     for res in results:
