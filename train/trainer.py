@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, random_split
 import os
 import time
 from dataset import HDF5Dataset, HDF5DataLoader
-from cnn import CRNN
+from models import CRNN, HarmonicCNN, FCN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
@@ -33,7 +33,7 @@ num_epochs = 100
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
-learning_rate = 0.001
+learning_rate = 0.0001
 num_workers = 8
 feature_type = "log_mel"
 if feature_type == "mfcc":
@@ -67,8 +67,8 @@ train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=num_work
 val_loader = HDF5DataLoader(val_dataset, batch_size=32, num_workers=num_workers)
 # Load model
 print("num_classes", num_classes)
-model = CRNN(
-    sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=96, n_class=50
+model = FCN(
+    sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=128, n_class=50
 )
 model = model.to(device)
 print(model)
@@ -80,7 +80,7 @@ criterion = nn.BCELoss()
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 
 # Resume training
-model_path = "models/CNN"
+model_path = "models/FCN_" + str(learning_rate)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
@@ -95,6 +95,7 @@ for epoch in range(start_epoch, num_epochs):
     training_loss = 0.0
     correct = 0
     total = 0
+    confusion_matrix = torch.zeros((num_classes, 4)).to(device)
     for i, data in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}")):
         inputs, labels = data
         inputs = inputs.to(device)
@@ -105,11 +106,11 @@ for epoch in range(start_epoch, num_epochs):
         loss.backward()
         optimizer.step()
         training_loss += loss.item()
-
-        total += labels.numel()
-        correct += (outputs.round() == labels).sum().item()
-
-    training_acc = correct / total
+        batch_confusion_matrix = compute_confusion_matrix(
+            outputs, labels
+        )
+        confusion_matrix += batch_confusion_matrix
+    log_confusion_matrix(writer, confusion_matrix, epoch + 1)
     training_loss /= len(train_loader)
     writer.add_scalar(
         "train/Loss",
@@ -117,13 +118,8 @@ for epoch in range(start_epoch, num_epochs):
         epoch + 1,
         walltime=time.time(),
     )
-    writer.add_scalar(
-        "train/Accuracy",
-        training_acc,
-        epoch + 1,
-        walltime=time.time(),
-    )
-    print(f"Epoch {epoch + 1} Loss: {training_loss}, Accuracy: {training_acc}")
+
+    print(f"Epoch {epoch + 1} Loss: {training_loss}")
 
     if (epoch + 1) % save_interval == 0:
         # validation

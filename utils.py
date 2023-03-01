@@ -97,16 +97,40 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
     writer.add_scalar(f"val/roc_auc", roc_auc, epoch)
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
     # print("confusion_matrix",confusion_matrix)
-    fig = plt.figure(figsize=(6, 6))
+    # fig = plt.figure(figsize=(6, 6))
+    # plt.imshow(confusion_matrix, cmap="Blues")
+    # plt.colorbar()
+    # plt.xlabel('True label ("tp, fp, fn, tn")')
+    # plt.ylabel("Predicted label")
+    # fig.canvas.draw()
+    # image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    # image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    # image_tensor = torch.from_numpy(image).permute(2, 0, 1)
+    # writer.add_image("Confusion matrix", image_tensor, epoch)
+
+    # Calculate normalized confusion matrix
+    positive_gt = confusion_matrix[:, 0] + confusion_matrix[:, 2]
+    negative_gt = confusion_matrix[:, 1] + confusion_matrix[:, 3]
+    confusion_matrix[:, 0] = confusion_matrix[:, 0] / positive_gt
+    confusion_matrix[:, 2] = confusion_matrix[:, 2] / positive_gt
+    confusion_matrix[:, 1] = confusion_matrix[:, 1] / negative_gt
+    confusion_matrix[:, 3] = confusion_matrix[:, 3] / negative_gt
+    print("tp", confusion_matrix[:, 0])
+    print("fn", confusion_matrix[:, 2])
+    print("fp", confusion_matrix[:, 1])
+    print("tn", confusion_matrix[:, 3])
+    # Plot normalized confusion matrix
+    fig2 = plt.figure(figsize=(6, 6))
     plt.imshow(confusion_matrix, cmap="Blues")
     plt.colorbar()
     plt.xlabel('True label ("tp, fp, fn, tn")')
     plt.ylabel("Predicted label")
-    fig.canvas.draw()
-    image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    fig2.canvas.draw()
+    image = np.fromstring(fig2.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    image = image.reshape(fig2.canvas.get_width_height()[::-1] + (3,))
     image_tensor = torch.from_numpy(image).permute(2, 0, 1)
-    writer.add_image("Confusion matrix", image_tensor, epoch)
+    writer.add_image("Normalized confusion matrix", image_tensor, epoch)
+
     print(f"precision: {precision_sum}, recall: {recall_sum}")
     print(f"f1: {f1_sum}, roc_auc: {roc_auc}")
 
