@@ -115,10 +115,6 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
     confusion_matrix[:, 2] = confusion_matrix[:, 2] / positive_gt
     confusion_matrix[:, 1] = confusion_matrix[:, 1] / negative_gt
     confusion_matrix[:, 3] = confusion_matrix[:, 3] / negative_gt
-    print("tp", confusion_matrix[:, 0])
-    print("fn", confusion_matrix[:, 2])
-    print("fp", confusion_matrix[:, 1])
-    print("tn", confusion_matrix[:, 3])
     # Plot normalized confusion matrix
     fig2 = plt.figure(figsize=(6, 6))
     plt.imshow(confusion_matrix, cmap="Blues")

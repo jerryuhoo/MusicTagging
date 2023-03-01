@@ -161,8 +161,8 @@ for epoch in range(start_epoch, num_epochs):
                 walltime=time.time(),
             )
             roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
-            writer.add_scalar(f"train/roc_auc", roc_auc, epoch)
-            writer.add_scalar(f"train/pr_auc", pr_auc, epoch)
+            writer.add_scalar(f"val/roc_auc", roc_auc, epoch)
+            writer.add_scalar(f"val/pr_auc", pr_auc, epoch)
             log_confusion_matrix(writer, confusion_matrix, epoch + 1)
         # save model
         if saved_models_count < max_models_saved:
