@@ -21,6 +21,7 @@ from utils import (
     check_device,
     compute_confusion_matrix,
     log_confusion_matrix,
+    get_auc
 )
 
 
@@ -29,7 +30,7 @@ device = check_device()
 # Define the hyperparameters
 num_classes = 50
 batch_size = 32
-num_epochs = 100
+num_epochs = 50
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
@@ -95,7 +96,7 @@ for epoch in range(start_epoch, num_epochs):
     training_loss = 0.0
     correct = 0
     total = 0
-    confusion_matrix = torch.zeros((num_classes, 4)).to(device)
+    
     for i, data in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}")):
         inputs, labels = data
         inputs = inputs.to(device)
@@ -106,11 +107,6 @@ for epoch in range(start_epoch, num_epochs):
         loss.backward()
         optimizer.step()
         training_loss += loss.item()
-        batch_confusion_matrix = compute_confusion_matrix(
-            outputs, labels
-        )
-        confusion_matrix += batch_confusion_matrix
-    log_confusion_matrix(writer, confusion_matrix, epoch + 1)
     training_loss /= len(train_loader)
     writer.add_scalar(
         "train/Loss",
@@ -129,6 +125,9 @@ for epoch in range(start_epoch, num_epochs):
             correct = 0
             total = 0
             confusion_matrix = torch.zeros((num_classes, 4)).to(device)
+            output_array = np.empty((0, 50))
+            label_array = np.empty((0, 50))
+
             for val_data in val_loader:
                 val_inputs, val_labels = val_data
                 val_inputs = val_inputs.to(device)
@@ -142,6 +141,10 @@ for epoch in range(start_epoch, num_epochs):
                     val_outputs, val_labels
                 )
                 confusion_matrix += batch_confusion_matrix
+                val_outputs = val_outputs.detach().cpu().numpy()
+                val_outputs = (val_outputs >= 0.5).astype(int)
+                output_array = np.concatenate((output_array, val_outputs))
+                label_array = np.concatenate((label_array, val_labels.detach().cpu().numpy()))
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
@@ -157,6 +160,9 @@ for epoch in range(start_epoch, num_epochs):
                 epoch + 1,
                 walltime=time.time(),
             )
+            roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
+            writer.add_scalar(f"train/roc_auc", roc_auc, epoch)
+            writer.add_scalar(f"train/pr_auc", pr_auc, epoch)
             log_confusion_matrix(writer, confusion_matrix, epoch + 1)
         # save model
         if saved_models_count < max_models_saved:

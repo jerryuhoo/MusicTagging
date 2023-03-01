@@ -2,7 +2,7 @@ import torch
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-from multiprocessing import Pool
+from sklearn import metrics
 
 
 def load_best_model(model, path):
@@ -85,16 +85,16 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
     precision_sum = tp_sum / (tp_sum + fp_sum)
     recall_sum = tp_sum / (tp_sum + fn_sum)
     f1_sum = 2 * precision_sum * recall_sum / (precision_sum + recall_sum)
-    roc_auc = calculate_roc_auc(
-        confusion_matrix[:, 0],
-        confusion_matrix[:, 1],
-        confusion_matrix[:, 2],
-        confusion_matrix[:, 3],
-    )
+    # roc_auc = calculate_roc_auc(
+    #     confusion_matrix[:, 0],
+    #     confusion_matrix[:, 1],
+    #     confusion_matrix[:, 2],
+    #     confusion_matrix[:, 3],
+    # )
     writer.add_scalar(f"val/precision", precision_sum, epoch)
     writer.add_scalar(f"val/recall", recall_sum, epoch)
     writer.add_scalar(f"val/f1", f1_sum, epoch)
-    writer.add_scalar(f"val/roc_auc", roc_auc, epoch)
+
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
     # print("confusion_matrix",confusion_matrix)
     # fig = plt.figure(figsize=(6, 6))
@@ -132,7 +132,7 @@ def log_confusion_matrix(writer, confusion_matrix, epoch):
     writer.add_image("Normalized confusion matrix", image_tensor, epoch)
 
     print(f"precision: {precision_sum}, recall: {recall_sum}")
-    print(f"f1: {f1_sum}, roc_auc: {roc_auc}")
+    print(f"f1: {f1_sum}")
 
 
 def calculate_roc_auc(tp, fp, fn, tn):
@@ -142,3 +142,10 @@ def calculate_roc_auc(tp, fp, fn, tn):
     tpr = tpr[indices]
     area = torch.trapz(tpr, thresholds)
     return area.item()
+
+def get_auc(y_true, y_score):
+    roc_aucs  = metrics.roc_auc_score(y_true, y_score, average='macro')
+    pr_aucs = metrics.average_precision_score(y_true, y_score, average='macro')
+    print('roc_auc: %.4f' % roc_aucs)
+    print('pr_auc: %.4f' % pr_aucs)
+    return roc_aucs, pr_aucs
