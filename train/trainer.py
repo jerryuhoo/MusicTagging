@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
+import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader, random_split
 import os
@@ -11,6 +11,8 @@ from models import CRNN, HarmonicCNN, FCN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
+
+import pandas as pd
 import sys
 
 sys.path.append(".")
@@ -21,21 +23,21 @@ from utils import (
     check_device,
     compute_confusion_matrix,
     log_confusion_matrix,
-    get_auc
+    get_auc,
 )
 
 
 device = check_device()
 
 # Define the hyperparameters
-num_classes = 50
 batch_size = 32
-num_epochs = 50
+num_epochs = 100
 saved_models_count = 0
 max_models_saved = 5
 save_interval = 5
 learning_rate = 0.0001
 num_workers = 8
+csv_dir = "../data/magnatagatune/annotations_final_new.csv"
 feature_type = "log_mel"
 if feature_type == "mfcc":
     input_dim = 25
@@ -66,8 +68,14 @@ train_dataset, val_dataset, test_dataset = random_split(
 
 train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=num_workers)
 val_loader = HDF5DataLoader(val_dataset, batch_size=32, num_workers=num_workers)
-# Load model
+
+df = pd.read_csv(csv_dir, sep="\t")
+label_names = df.columns.values
+print("labels", label_names)
+num_classes = len(label_names) - 2
 print("num_classes", num_classes)
+
+# Load model
 model = FCN(
     sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=128, n_class=50
 )
@@ -75,13 +83,15 @@ model = model.to(device)
 print(model)
 
 # Define the loss function
-criterion = nn.BCELoss()
+# criterion = nn.BCELoss()
+# weights = torch.tensor([1.0, 5.0]).to(device)
+# criterion = nn.BCEWithLogitsLoss(pos_weight=weights, reduction="none")
 
 # Define the optimizer
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 
 # Resume training
-model_path = "models/FCN_" + str(learning_rate)
+model_path = "models/FCN_weightedloss_" + str(learning_rate)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
@@ -96,14 +106,18 @@ for epoch in range(start_epoch, num_epochs):
     training_loss = 0.0
     correct = 0
     total = 0
-    
+
     for i, data in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}")):
         inputs, labels = data
         inputs = inputs.to(device)
         labels = labels.to(device).float()
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        weights = torch.zeros_like(labels)
+        weights[labels == 0] = 0.1  # Set weight for negative samples
+        weights[labels == 1] = 0.9  # Set weight for positive samples
+        loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
+        # loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         training_loss += loss.item()
@@ -133,7 +147,13 @@ for epoch in range(start_epoch, num_epochs):
                 val_inputs = val_inputs.to(device)
                 val_labels = val_labels.to(device).float()
                 val_outputs = model(val_inputs)
-                loss = criterion(val_outputs, val_labels)
+                # loss = criterion(val_outputs, val_labels)
+                weights = torch.zeros_like(val_labels)
+                weights[val_labels == 0] = 0.1  # Set weight for negative samples
+                weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                loss = F.binary_cross_entropy_with_logits(
+                    val_outputs, val_labels, weight=weights
+                )
                 val_loss += loss.item()
                 total += val_labels.numel()
                 correct += (val_outputs.round() == val_labels).sum().item()
@@ -144,7 +164,9 @@ for epoch in range(start_epoch, num_epochs):
                 val_outputs = val_outputs.detach().cpu().numpy()
                 val_outputs = (val_outputs >= 0.5).astype(int)
                 output_array = np.concatenate((output_array, val_outputs))
-                label_array = np.concatenate((label_array, val_labels.detach().cpu().numpy()))
+                label_array = np.concatenate(
+                    (label_array, val_labels.detach().cpu().numpy())
+                )
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
@@ -163,7 +185,7 @@ for epoch in range(start_epoch, num_epochs):
             roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
             writer.add_scalar(f"val/roc_auc", roc_auc, epoch + 1)
             writer.add_scalar(f"val/pr_auc", pr_auc, epoch + 1)
-            log_confusion_matrix(writer, confusion_matrix, epoch + 1)
+            log_confusion_matrix(writer, confusion_matrix, label_names, epoch + 1)
         # save model
         if saved_models_count < max_models_saved:
             model_file = os.path.join(

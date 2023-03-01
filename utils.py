@@ -65,18 +65,21 @@ def compute_confusion_matrix(y_pred, y_true):
     return torch.stack([tp, fp, fn, tn], dim=1)
 
 
-def log_confusion_matrix(writer, confusion_matrix, epoch):
+def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
     for i in range(confusion_matrix.shape[0]):
         tp = confusion_matrix[i, 0]
         fp = confusion_matrix[i, 1]
         fn = confusion_matrix[i, 2]
         tn = confusion_matrix[i, 3]
+        # print(f"{label_names[i]}/tp:", tp)
+        # print(f"{label_names[i]}/predicted positive:", tp + fp)
+        # print(f"{label_names[i]}/gt positive:", tp + fn)
         precision = tp / (tp + fp)
         recall = tp / (tp + fn)
         f1 = 2 * precision * recall / (precision + recall)
-        writer.add_scalar(f"class_{i}/precision", precision, epoch)
-        writer.add_scalar(f"class_{i}/recall", recall, epoch)
-        writer.add_scalar(f"class_{i}/f1", f1, epoch)
+        writer.add_scalar(f"class_{i}_{label_names[i]}/precision", precision, epoch)
+        writer.add_scalar(f"class_{i}_{label_names[i]}/recall", recall, epoch)
+        writer.add_scalar(f"class_{i}_{label_names[i]}/f1", f1, epoch)
 
     tp_sum = torch.sum(confusion_matrix[:, 0], dim=0)
     fp_sum = torch.sum(confusion_matrix[:, 1], dim=0)
@@ -139,9 +142,10 @@ def calculate_roc_auc(tp, fp, fn, tn):
     area = torch.trapz(tpr, thresholds)
     return area.item()
 
+
 def get_auc(y_true, y_score):
-    roc_aucs  = metrics.roc_auc_score(y_true, y_score, average='macro')
-    pr_aucs = metrics.average_precision_score(y_true, y_score, average='macro')
-    print('roc_auc: %.4f' % roc_aucs)
-    print('pr_auc: %.4f' % pr_aucs)
+    roc_aucs = metrics.roc_auc_score(y_true, y_score, average="macro")
+    pr_aucs = metrics.average_precision_score(y_true, y_score, average="macro")
+    print("roc_auc: %.4f" % roc_aucs)
+    print("pr_auc: %.4f" % pr_aucs)
     return roc_aucs, pr_aucs
