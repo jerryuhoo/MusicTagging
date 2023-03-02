@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, random_split
 import os
 import time
 from dataset import HDF5Dataset, HDF5DataLoader
-from models import CRNN, HarmonicCNN, FCN
+from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
@@ -76,7 +76,8 @@ num_classes = len(label_names) - 2
 print("num_classes", num_classes)
 
 # Load model
-model = FCN(
+model_name = "ShortChunkCNN"
+model = ShortChunkCNN(
     sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=128, n_class=50
 )
 model = model.to(device)
@@ -91,7 +92,7 @@ print(model)
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 
 # Resume training
-model_path = "models/FCN_weightedloss_" + str(learning_rate)
+model_path = "models/" + model_name + "_weightedloss_" + str(learning_rate)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
