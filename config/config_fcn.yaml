@@ -27,12 +27,13 @@ dataset:
 
 # optimizer
 optimizer:
-  name: adam
+  name: AdamW
   lr: 0.0001
   weight_decay: 0.0001
 
 loss:
-  type: BCE # BCE / weightedBCE
+  type: weightedBCE # BCE / weightedBCE
+  weight: balanced # fixed / balanced
 # trainer
 # trainer:
 #   gpus: 1

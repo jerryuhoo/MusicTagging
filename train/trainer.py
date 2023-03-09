@@ -92,6 +92,11 @@ print(model)
 
 if loss_type == 'BCE':
     bce_loss = nn.BCELoss()
+    loss_type2 = 'BCE'
+elif loss_type == 'weightedBCE':
+    loss_type2 = 'weightedBCE_' + config['loss']['weight']
+
+print("loss", loss_type2)
 # Define the loss function
 # criterion = nn.BCELoss()
 # weights = torch.tensor([1.0, 5.0]).to(device)
@@ -104,10 +109,10 @@ optimizer_weight_decay = config['optimizer']['weight_decay']
 
 # create optimizer
 optimizer_class = getattr(optim, optimizer_name)
-optimizer = optimizer_class(lr=optimizer_lr, weight_decay=optimizer_weight_decay)
+optimizer = optimizer_class(model.parameters(), lr=optimizer_lr, weight_decay=optimizer_weight_decay)
 
 # Resume training
-model_path = "models/" + model_name + "_" + loss_type + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
+model_path = "models/" + model_name + "_" + loss_type2 + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
@@ -130,9 +135,12 @@ for epoch in range(start_epoch, num_epochs):
         optimizer.zero_grad()
         outputs = model(inputs)
         if loss_type == 'weightedBCE':
-            weights = torch.zeros_like(labels)
-            weights[labels == 0] = 0.1  # Set weight for negative samples
-            weights[labels == 1] = 0.9  # Set weight for positive samples
+            if config['loss']['weight'] == 'fixed':
+                weights[labels == 0] = 0.1  # Set weight for negative samples
+                weights[labels == 1] = 0.9  # Set weight for positive samples
+            elif config['loss']['weight'] == 'balanced':
+                label_distribution = labels.mean(dim=0)
+                weights = 1 / label_distribution
             loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
         elif loss_type == 'BCE':
             loss = bce_loss(outputs, labels)
@@ -167,8 +175,12 @@ for epoch in range(start_epoch, num_epochs):
                 val_outputs = model(val_inputs)
                 if loss_type == 'weightedBCE':
                     weights = torch.zeros_like(val_labels)
-                    weights[val_labels == 0] = 0.1  # Set weight for negative samples
-                    weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                    if config['loss']['weight'] == 'fixed':
+                        weights[val_labels == 0] = 0.1  # Set weight for negative samples
+                        weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                    elif config['loss']['weight'] == 'balanced':
+                        label_distribution = val_labels.mean(dim=0)
+                        weights = 1 / label_distribution
                     loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
                 elif loss_type == 'BCE':
                     loss = bce_loss(val_outputs, val_labels)
