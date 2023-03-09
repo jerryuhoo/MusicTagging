@@ -60,6 +60,7 @@ dataset = HDF5Dataset(
     label_h5_path="preprocessed/label.h5",
     feature_type=feature_type,
 )
+
 train_ratio = 0.8
 val_ratio = 0.1
 test_ratio = 0.1
@@ -82,6 +83,21 @@ label_names = df.columns.values
 print("labels", label_names)
 num_classes = len(label_names) - 2
 print("num_classes", num_classes)
+
+
+if config['loss']['type'] == "weightedBCE" and config['loss']['weight'] == "balanced":
+    # Get the targets from the dataset
+    num_samples = 0
+    label_distribution = torch.zeros(num_classes)
+    for features, targets in train_loader:
+        num_samples += features.size(0)
+        label_distribution += targets.sum(dim=0)
+    label_distribution /= num_samples
+    print("num_samples", num_samples)
+    weights = 1 / label_distribution
+    auto_weights = weights / weights.sum() * num_classes
+    auto_weights = auto_weights.to(device)
+    print("auto_weights", auto_weights)
 
 # Load model
 model_name = config['model']['name']
@@ -139,8 +155,7 @@ for epoch in range(start_epoch, num_epochs):
                 weights[labels == 0] = 0.1  # Set weight for negative samples
                 weights[labels == 1] = 0.9  # Set weight for positive samples
             elif config['loss']['weight'] == 'balanced':
-                label_distribution = labels.mean(dim=0)
-                weights = 1 / label_distribution
+                weights = auto_weights
             loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
         elif loss_type == 'BCE':
             loss = bce_loss(outputs, labels)
@@ -179,8 +194,7 @@ for epoch in range(start_epoch, num_epochs):
                         weights[val_labels == 0] = 0.1  # Set weight for negative samples
                         weights[val_labels == 1] = 0.9  # Set weight for positive samples
                     elif config['loss']['weight'] == 'balanced':
-                        label_distribution = val_labels.mean(dim=0)
-                        weights = 1 / label_distribution
+                        weights = auto_weights
                     loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
                 elif loss_type == 'BCE':
                     loss = bce_loss(val_outputs, val_labels)
