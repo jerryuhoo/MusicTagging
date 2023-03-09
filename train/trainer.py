@@ -7,11 +7,11 @@ from torch.utils.data import DataLoader, random_split
 import os
 import time
 from dataset import HDF5Dataset, HDF5DataLoader
-from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
+# from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
-
+import yaml
 import pandas as pd
 import sys
 
@@ -24,21 +24,29 @@ from utils import (
     compute_confusion_matrix,
     log_confusion_matrix,
     get_auc,
+    get_model
 )
 
 
 device = check_device()
 
+
+# load configuration file
+with open('config/config_fcn.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
 # Define the hyperparameters
-batch_size = 32
-num_epochs = 100
-saved_models_count = 0
-max_models_saved = 5
-save_interval = 5
-learning_rate = 0.0001
-num_workers = 8
-csv_dir = "../data/magnatagatune/annotations_final_new.csv"
-feature_type = "log_mel"
+feature_length = 30
+learning_rate = config['learning_rate']
+batch_size = config['batch_size']
+num_epochs = config['num_epochs']
+saved_models_count = config['saved_models_count']
+max_models_saved = config['max_models_saved']
+save_interval = config['save_interval']
+num_workers = config['num_workers']
+csv_dir = config['dataset']['csv_dir']
+
+feature_type = config['feature_type']
 if feature_type == "mfcc":
     input_dim = 25
     feature_h5_path = "preprocessed/mfcc.h5"
@@ -76,23 +84,30 @@ num_classes = len(label_names) - 2
 print("num_classes", num_classes)
 
 # Load model
-model_name = "ShortChunkCNN"
-model = ShortChunkCNN(
-    sample_rate=16000, n_fft=512, f_min=0.0, f_max=8000.0, n_mels=128, n_class=50
-)
+model_name = config['model']['name']
+loss_type = config['loss']['type']
+model = get_model(config)
 model = model.to(device)
 print(model)
 
+if loss_type == 'BCE':
+    bce_loss = nn.BCELoss()
 # Define the loss function
 # criterion = nn.BCELoss()
 # weights = torch.tensor([1.0, 5.0]).to(device)
 # criterion = nn.BCEWithLogitsLoss(pos_weight=weights, reduction="none")
 
-# Define the optimizer
-optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
+# parse optimizer settings
+optimizer_name = config['optimizer']['name']
+optimizer_lr = config['optimizer']['lr']
+optimizer_weight_decay = config['optimizer']['weight_decay']
+
+# create optimizer
+optimizer_class = getattr(optim, optimizer_name)
+optimizer = optimizer_class(lr=optimizer_lr, weight_decay=optimizer_weight_decay)
 
 # Resume training
-model_path = "models/" + model_name + "_weightedloss_" + str(learning_rate)
+model_path = "models/" + model_name + "_" + loss_type + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
@@ -114,11 +129,13 @@ for epoch in range(start_epoch, num_epochs):
         labels = labels.to(device).float()
         optimizer.zero_grad()
         outputs = model(inputs)
-        weights = torch.zeros_like(labels)
-        weights[labels == 0] = 0.1  # Set weight for negative samples
-        weights[labels == 1] = 0.9  # Set weight for positive samples
-        loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
-        # loss = criterion(outputs, labels)
+        if loss_type == 'weightedBCE':
+            weights = torch.zeros_like(labels)
+            weights[labels == 0] = 0.1  # Set weight for negative samples
+            weights[labels == 1] = 0.9  # Set weight for positive samples
+            loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
+        elif loss_type == 'BCE':
+            loss = bce_loss(outputs, labels)
         loss.backward()
         optimizer.step()
         training_loss += loss.item()
@@ -148,13 +165,13 @@ for epoch in range(start_epoch, num_epochs):
                 val_inputs = val_inputs.to(device)
                 val_labels = val_labels.to(device).float()
                 val_outputs = model(val_inputs)
-                # loss = criterion(val_outputs, val_labels)
-                weights = torch.zeros_like(val_labels)
-                weights[val_labels == 0] = 0.1  # Set weight for negative samples
-                weights[val_labels == 1] = 0.9  # Set weight for positive samples
-                loss = F.binary_cross_entropy_with_logits(
-                    val_outputs, val_labels, weight=weights
-                )
+                if loss_type == 'weightedBCE':
+                    weights = torch.zeros_like(val_labels)
+                    weights[val_labels == 0] = 0.1  # Set weight for negative samples
+                    weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                    loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
+                elif loss_type == 'BCE':
+                    loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
                 total += val_labels.numel()
                 correct += (val_outputs.round() == val_labels).sum().item()

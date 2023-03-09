@@ -19,7 +19,7 @@ def extract_mfcc_mean(mfcc):
     mean_mean = np.mean(mfcc, axis=1)
     return mean_mean
 
-def extract_log_mel(y, sr, n_mels=128, fmin=20, fmax=8000, n_fft=2048, hop_length=512):
+def extract_log_mel(y, sr, n_mels=128, fmin=0, fmax=8000, n_fft=512, hop_length=256):
     mel_spec = librosa.feature.melspectrogram(
         y,
         sr=sr,
@@ -60,17 +60,20 @@ def preprocess_segment(args):
     except Exception:
         print("error: {}".format(audio_path))
 
-def preprocess_data(song_dir, csv_dir, save_dir, n_workers=2):
+def preprocess_data(song_dir, csv_dir, save_dir, n_workers=2, win_len=10, step_len=5, total_len=30):
     os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
     # data segment: 30s => 5 * 10s, step length is 5s
     sr = 16000
-    total_length = 30 * sr
-    window_length = 10 * sr
-    step = 5 * sr
-    seg_count = (30 - 5) // 5
+    total_length = total_len * sr
+    window_length = win_len * sr
+    step = step_len * sr
+    if step_len == 0:
+        seg_count = 0
+    else:
+        seg_count = (total_len - win_len) // step_len + 1
 
     # load csv
     df = pd.read_csv(csv_dir, sep="\t")

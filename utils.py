@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import metrics
-
+from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 
 def load_best_model(model, path):
     models = [f for f in os.listdir(path) if f.endswith(".pt")]
@@ -149,3 +149,43 @@ def get_auc(y_true, y_score):
     print("roc_auc: %.4f" % roc_aucs)
     print("pr_auc: %.4f" % pr_aucs)
     return roc_aucs, pr_aucs
+
+def get_model(config):
+    if config['model']['name'] == 'FCN':
+        return FCN(
+            sample_rate=config['model']['sample_rate'], 
+            n_fft=config['model']['n_fft'], 
+            f_min=config['model']['f_min'], 
+            f_max=config['model']['f_max'], 
+            n_mels=config['model']['n_mels'], 
+            n_class=config['dataset']['num_classes'], 
+        )
+    elif config['model']['name'] == 'CRNN':
+        return CRNN(
+            sample_rate=config['model']['sample_rate'], 
+            n_fft=config['model']['n_fft'], 
+            f_min=config['model']['f_min'], 
+            f_max=config['model']['f_max'], 
+            n_mels=config['model']['n_mels'], 
+            n_class=config['dataset']['num_classes'], 
+        )
+    elif config['model']['name'] == 'HarmonicCNN':
+        return HarmonicCNN(
+            sample_rate=config['model']['sample_rate'], 
+            n_fft=config['model']['n_fft'], 
+            f_min=config['model']['f_min'], 
+            f_max=config['model']['f_max'], 
+            n_mels=config['model']['n_mels'], 
+            n_class=config['dataset']['num_classes'], 
+        )
+    elif config['model']['name'] == 'ShortChunkCNN':
+        return ShortChunkCNN(
+            sample_rate=config['model']['sample_rate'], 
+            n_fft=config['model']['n_fft'], 
+            f_min=config['model']['f_min'], 
+            f_max=config['model']['f_max'], 
+            n_mels=config['model']['n_mels'], 
+            n_class=config['dataset']['num_classes'], 
+        )
+    else:
+        raise ValueError('Unknown model name: {}'.format(config['model']['name']))
