@@ -92,15 +92,19 @@ print("num_classes", num_classes)
 if config['loss']['type'] == "weightedBCE":
     # Get the targets from the dataset
     num_samples = 0
-    label_distribution = torch.zeros(num_classes)
+    label_count = torch.zeros(num_classes)
     for features, targets in train_loader:
         num_samples += features.size(0)
-        label_distribution += targets.sum(dim=0)
-    label_distribution /= num_samples
-    num_pos = label_distribution.sum()
-    pos_weight = (num_samples - num_pos) / num_samples
+        label_count += targets.sum(dim=0)
+    print("label_count", label_count)
+    num_pos = label_count.sum()
+    label_distribution = label_count / num_samples
+    print("num_pos", num_pos)
+    print("num_samples", num_samples)
+    total_labels = num_samples * num_classes
+    pos_weight = (total_labels - num_pos) / total_labels
     print("pos_weight", pos_weight)
-    auto_weights = torch.tensor([pos_weight if label == 1 else 1 for label in label_distribution], dtype=torch.float32, device=device)
+    auto_weights = torch.tensor(1.0 - label_distribution, dtype=torch.float32, device=device)
     print("auto_weights", auto_weights)
 
 # Load model
