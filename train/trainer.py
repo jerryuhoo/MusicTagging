@@ -52,32 +52,43 @@ preprocessed_path = "preprocessed/" + str(feature_length) + "/"
 
 if feature_type == "mfcc":
     input_dim = 25
-    feature_h5_path = preprocessed_path + "/mfcc.h5"
+    train_feature_h5_path = preprocessed_path + "training" + "/mfcc.h5"
+    val_feature_h5_path = preprocessed_path + "validation" + "/mfcc.h5"
+    test_feature_h5_path = preprocessed_path + "testing" + "/mfcc.h5"
 if feature_type == "log_mel":
     input_dim = 128
-    feature_h5_path = preprocessed_path + "/log_mel.h5"
+    train_feature_h5_path = preprocessed_path + "training" + "/log_mel.h5"
+    val_feature_h5_path = preprocessed_path + "validation" + "/log_mel.h5"
+    test_feature_h5_path = preprocessed_path + "testing" + "/log_mel.h5"
 
-label_h5_path = preprocessed_path + "/label.h5"
+train_label_h5_path = preprocessed_path + "training" + "/label.h5"
+val_label_h5_path = preprocessed_path + "validation" + "/label.h5"
+test_label_h5_path = preprocessed_path + "testing" + "/label.h5"
 
-dataset = HDF5Dataset(
-    feature_h5_path=feature_h5_path,
-    label_h5_path=label_h5_path,
+train_dataset = HDF5Dataset(
+    feature_h5_path=train_feature_h5_path,
+    label_h5_path=train_label_h5_path,
     feature_type=feature_type,
 )
 
-train_ratio = 0.8
-val_ratio = 0.1
-test_ratio = 0.1
-total_len = len(dataset)
-train_len = int(total_len * train_ratio)
-val_len = int(total_len * val_ratio)
-test_len = total_len - train_len - val_len
+val_dataset = HDF5Dataset(
+    feature_h5_path=val_feature_h5_path,
+    label_h5_path=val_label_h5_path,
+    feature_type=feature_type,
+)
+
+test_dataset = HDF5Dataset(
+    feature_h5_path=test_feature_h5_path,
+    label_h5_path=test_label_h5_path,
+    feature_type=feature_type,
+)
+
+train_len = len(train_dataset)
+val_len = len(val_dataset)
+test_len = len(test_dataset)
 print("train_len", train_len)
 print("val_len", val_len)
 print("test_len", test_len)
-train_dataset, val_dataset, test_dataset = random_split(
-    dataset, [train_len, val_len, test_len]
-)
 
 train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=num_workers)
 val_loader = HDF5DataLoader(val_dataset, batch_size=32, num_workers=num_workers)
