@@ -36,7 +36,7 @@ with open('config/config_fcn.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Define the hyperparameters
-feature_length = 30
+feature_length = config['feature_length']
 learning_rate = config['learning_rate']
 batch_size = config['batch_size']
 num_epochs = config['num_epochs']
@@ -47,17 +47,21 @@ num_workers = config['num_workers']
 csv_dir = config['dataset']['csv_dir']
 
 feature_type = config['feature_type']
+
+preprocessed_path = "preprocessed/" + str(feature_length) + "/"
+
 if feature_type == "mfcc":
     input_dim = 25
-    feature_h5_path = "preprocessed/mfcc.h5"
+    feature_h5_path = preprocessed_path + "/mfcc.h5"
 if feature_type == "log_mel":
     input_dim = 128
-    feature_h5_path = "preprocessed/log_mel.h5"
+    feature_h5_path = preprocessed_path + "/log_mel.h5"
 
+label_h5_path = preprocessed_path + "/label.h5"
 
 dataset = HDF5Dataset(
     feature_h5_path=feature_h5_path,
-    label_h5_path="preprocessed/label.h5",
+    label_h5_path=label_h5_path,
     feature_type=feature_type,
 )
 
@@ -85,7 +89,7 @@ num_classes = len(label_names) - 2
 print("num_classes", num_classes)
 
 
-if config['loss']['type'] == "weightedBCE" and config['loss']['weight'] == "balanced":
+if config['loss']['type'] == "weightedBCE":
     # Get the targets from the dataset
     num_samples = 0
     label_distribution = torch.zeros(num_classes)
@@ -93,10 +97,10 @@ if config['loss']['type'] == "weightedBCE" and config['loss']['weight'] == "bala
         num_samples += features.size(0)
         label_distribution += targets.sum(dim=0)
     label_distribution /= num_samples
-    print("num_samples", num_samples)
-    weights = 1 / label_distribution
-    auto_weights = weights / weights.sum() * num_classes
-    auto_weights = auto_weights.to(device)
+    num_pos = label_distribution.sum()
+    pos_weight = (num_samples - num_pos) / num_samples
+    print("pos_weight", pos_weight)
+    auto_weights = torch.tensor([pos_weight if label == 1 else 1 for label in label_distribution], dtype=torch.float32, device=device)
     print("auto_weights", auto_weights)
 
 # Load model
@@ -152,8 +156,13 @@ for epoch in range(start_epoch, num_epochs):
         outputs = model(inputs)
         if loss_type == 'weightedBCE':
             if config['loss']['weight'] == 'fixed':
+                weights = torch.zeros_like(labels)
                 weights[labels == 0] = 0.1  # Set weight for negative samples
                 weights[labels == 1] = 0.9  # Set weight for positive samples
+            elif config['loss']['weight'] == 'balanced_pn':
+                weights = torch.zeros_like(labels)
+                weights[labels == 0] = 1 - pos_weight
+                weights[labels == 1] = pos_weight
             elif config['loss']['weight'] == 'balanced':
                 weights = auto_weights
             loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
@@ -189,10 +198,14 @@ for epoch in range(start_epoch, num_epochs):
                 val_labels = val_labels.to(device).float()
                 val_outputs = model(val_inputs)
                 if loss_type == 'weightedBCE':
-                    weights = torch.zeros_like(val_labels)
                     if config['loss']['weight'] == 'fixed':
+                        weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 0.1  # Set weight for negative samples
                         weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                    elif config['loss']['weight'] == 'balanced_pn':
+                        weights = torch.zeros_like(val_labels)
+                        weights[val_labels == 0] = 1 - pos_weight
+                        weights[val_labels == 1] = pos_weight
                     elif config['loss']['weight'] == 'balanced':
                         weights = auto_weights
                     loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)

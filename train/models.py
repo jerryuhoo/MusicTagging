@@ -222,12 +222,19 @@ class FCN(nn.Module):
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
 
-        # FCN
-        self.layer1 = Conv_2d(1, 64, pooling=(2, 2))
-        self.layer2 = Conv_2d(64, 128, pooling=(2, 2))
-        self.layer3 = Conv_2d(128, 128, pooling=(2, 4))
-        self.layer4 = Conv_2d(128, 128, pooling=(4, 4))
-        self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
+        # # FCN short
+        # self.layer1 = Conv_2d(1, 64, pooling=(2, 2))
+        # self.layer2 = Conv_2d(64, 128, pooling=(2, 2))
+        # self.layer3 = Conv_2d(128, 128, pooling=(2, 4))
+        # self.layer4 = Conv_2d(128, 128, pooling=(4, 4))
+        # self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
+
+        # FCN long
+        self.layer1 = Conv_2d(1, 64, pooling=(2,4))
+        self.layer2 = Conv_2d(64, 128, pooling=(2,4))
+        self.layer3 = Conv_2d(128, 128, pooling=(2,4))
+        self.layer4 = Conv_2d(128, 128, pooling=(3,5))
+        self.layer5 = Conv_2d(128, 64, pooling=(4,4))
 
         # Dense
         self.dense = nn.Linear(64, n_class)

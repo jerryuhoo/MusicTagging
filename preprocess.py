@@ -6,7 +6,9 @@ from extract_feats import preprocess_data, create_hdf5_dataset
 from tqdm import tqdm
 import os
 
-stage = 2
+total_len=30
+
+stage = 0
 # clean the dataset
 if stage == 0:
     directory_labels = "../data/magnatagatune/"
@@ -16,12 +18,12 @@ if stage == 0:
 
 song_dir = "../data/magnatagatune/wav/"
 csv_dir = "../data/magnatagatune/annotations_final_new.csv"
-save_dir = "preprocessed/"
+save_dir = "preprocessed/" + str(total_len) + "/"
 os.makedirs(save_dir, exist_ok=True)
 
 if stage <= 1:
     # extract mfcc and labels, save them to numpy files.
-    preprocess_data(song_dir, csv_dir, save_dir)
+    preprocess_data(song_dir, csv_dir, save_dir, n_workers=2, win_len=30, step_len=30, total_len=total_len)
 
 if stage <= 2:
     if not os.path.exists(save_dir + "mfcc.h5"):

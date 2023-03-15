@@ -6,13 +6,20 @@ General machine learning / deep learning models for music tagging.
 Dataset: MagnaTagATune
 
 - [x] SVM
-- [ ] CNN
+- [x] FCN
+- [x] ShortChunk CNN
 - [ ] RNN
 - [ ] TCN
 - [ ] TSN
-- [ ] CRNN
+- [x] CRNN
 - [ ] Attention
 
+## Create conda environment
+```bash
+conda create --name tag python=3.8
+conda activate tag
+pip install -r requirements.txt 
+```
 ## Preprocess
 ```bash
 python preprocess.py
@@ -23,8 +30,8 @@ python preprocess.py
 python train_svm.py
 ```
 
-### CNN
+### DNN
 ```bash
-python CNN/trainer.py
+python train/trainer.py
 ```
 
