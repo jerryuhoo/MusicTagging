@@ -39,9 +39,12 @@ def extract_log_mel(y, sr, n_mels=128, fmin=0, fmax=8000, n_fft=512, hop_length=
 def preprocess_segment(args):
     song_dir, row_idx, row, sr, window_length, step, save_dir = args
     # print("row_idx",row_idx)
-    audio_path = os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".mp3"
-    base_name = os.path.basename(audio_path)
-    # audio_name = base_name.split(".")[0]
+    if song_dir == "../data/magnatagatune/mp3/":
+        audio_path = os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".mp3"
+    elif song_dir == "../data/magnatagatune/wav/":
+        audio_path = os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".wav"
+    else:
+        raise ValueError("song_dir should be either mp3 or wav")
     try:
         audio_data, _ = librosa.load(audio_path, sr=sr)
         pad_length = 30 * sr - len(audio_data)

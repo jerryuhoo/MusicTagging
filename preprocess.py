@@ -6,9 +6,11 @@ from extract_feats import preprocess_data, create_hdf5_dataset
 from tqdm import tqdm
 import os
 
+# config
 total_len = 30
+delete_npy = True
+stage = 3
 
-stage = 1
 # clean the dataset
 if stage == 0:
     directory_labels = "../data/magnatagatune/"
@@ -34,12 +36,34 @@ if stage <= 1:
     )
 
 if stage <= 2:
-    if not os.path.exists(save_dir + "mfcc.h5"):
-        print("creating mfcc.h5")
-        create_hdf5_dataset(save_dir + "mfcc", save_dir, "mfcc", 50000)
-    if not os.path.exists(save_dir + "label.h5"):
-        print("creating label.h5")
-        create_hdf5_dataset(save_dir + "label", save_dir, "label", 50000)
-    if not os.path.exists(save_dir + "log_mel.h5"):
-        print("creating log_mel.h5")
-        create_hdf5_dataset(save_dir + "log_mel", save_dir, "log_mel", 10000)
+    for folder in ["training", "validation", "testing"]:
+        print("processing " + folder)
+        if not os.path.exists(save_dir + folder + "/mfcc.h5"):
+            print("creating " + folder + "/mfcc.h5")
+            create_hdf5_dataset(
+                save_dir + folder + "/mfcc", save_dir + folder, "mfcc", 50000
+            )
+        if not os.path.exists(save_dir + folder + "/mfcc_mean.h5"):
+            print("creating " + folder + "/mfcc_mean.h5")
+            create_hdf5_dataset(
+                save_dir + folder + "/mfcc_mean", save_dir + folder, "mfcc_mean", 50000
+            )
+        if not os.path.exists(save_dir + folder + "/log_mel.h5"):
+            print("creating " + folder + "/log_mel.h5")
+            create_hdf5_dataset(
+                save_dir + folder + "/log_mel", save_dir + folder, "log_mel", 10000
+            )
+        if not os.path.exists(save_dir + folder + "/label.h5"):
+            print("creating " + folder + "/label.h5")
+            create_hdf5_dataset(
+                save_dir + folder + "/label", save_dir + folder, "label", 50000
+            )
+
+if delete_npy:
+    # delete folders that contains npy files
+    print("deleting npy files")
+    for folder in ["training", "validation", "testing"]:
+        for subfolder in ["mfcc", "mfcc_mean", "label", "log_mel"]:
+            os.system("rm -rf " + save_dir + folder + "/" + subfolder)
+
+print("done")
