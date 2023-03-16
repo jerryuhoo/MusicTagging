@@ -119,6 +119,7 @@ if config['loss']['type'] == "weightedBCE":
     balanced_class_weights = 1.0 - label_distribution
     balanced_class_weights = torch.tensor(balanced_class_weights, dtype=torch.float32, device=device)
     print("balanced_class_weights", balanced_class_weights)
+    weighted_bce_loss = nn.BCELoss(weight=balanced_class_weights)
 
 # Load model
 model_name = config['model']['name']
@@ -149,7 +150,7 @@ optimizer_class = getattr(optim, optimizer_name)
 optimizer = optimizer_class(model.parameters(), lr=optimizer_lr, weight_decay=optimizer_weight_decay)
 
 # Resume training
-model_path = "models/" + model_name + "_" + loss_type2 + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
+model_path = "models/" + model_name + "_" + loss_type2 + "_" + str(optimizer_name) + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
 if not os.path.exists(model_path):
     os.makedirs(model_path)
 best_model_path = load_best_model(model, model_path)
@@ -176,10 +177,12 @@ for epoch in range(start_epoch, num_epochs):
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 0.1  # Set weight for negative samples
                 weights[labels == 1] = 0.9  # Set weight for positive samples
+                weighted_bce_loss = nn.BCELoss(weight=weights)
             elif config['loss']['weight'] == 'balanced_pn':
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
+                weighted_bce_loss = nn.BCELoss(weight=weights)
             elif config['loss']['weight'] == 'balanced_cls':
                 weights = balanced_class_weights
             elif config['loss']['weight'] == 'balanced_pn_cls':
@@ -187,7 +190,9 @@ for epoch in range(start_epoch, num_epochs):
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
                 weights = weights * balanced_class_weights
-            loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
+                weighted_bce_loss = nn.BCELoss(weight=weights)
+            # loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
+            loss = weighted_bce_loss(outputs, labels)
         elif loss_type == 'BCE':
             loss = bce_loss(outputs, labels)
         loss.backward()
@@ -224,10 +229,12 @@ for epoch in range(start_epoch, num_epochs):
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 0.1  # Set weight for negative samples
                         weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                        weighted_bce_loss = nn.BCELoss(weight=weights)
                     elif config['loss']['weight'] == 'balanced_pn':
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
+                        weighted_bce_loss = nn.BCELoss(weight=weights)
                     elif config['loss']['weight'] == 'balanced_cls':
                         weights = balanced_class_weights
                     elif config['loss']['weight'] == 'balanced_pn_cls':
@@ -235,7 +242,9 @@ for epoch in range(start_epoch, num_epochs):
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
                         weights = weights * balanced_class_weights
-                    loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
+                        weighted_bce_loss = nn.BCELoss(weight=weights)
+                    # loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
+                    loss = weighted_bce_loss(val_outputs, val_labels)
                 elif loss_type == 'BCE':
                     loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
