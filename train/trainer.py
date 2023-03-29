@@ -113,8 +113,8 @@ print("train_len", train_len)
 print("val_len", val_len)
 print("test_len", test_len)
 
-train_loader = HDF5DataLoader(train_dataset, batch_size=32, num_workers=num_workers)
-val_loader = HDF5DataLoader(val_dataset, batch_size=32, num_workers=num_workers)
+train_loader = HDF5DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers)
+val_loader = HDF5DataLoader(val_dataset, batch_size=batch_size, num_workers=num_workers)
 
 df = pd.read_csv(csv_dir, sep="\t")
 label_names = df.columns.values
@@ -138,13 +138,16 @@ if config["loss"]["type"] == "weightedBCE":
     print("num_samples", num_samples)
     total_labels = num_samples * num_classes
     pos_weight = (total_labels - num_pos) / total_labels
+    neg_weight = num_pos / total_labels
     print("pos_weight", pos_weight)
-    balanced_class_weights = 1.0 - label_distribution
-    balanced_class_weights = torch.tensor(
-        balanced_class_weights, dtype=torch.float32, device=device
+    print("neg_weight", neg_weight)
+    global_class_weights = 1.0 - label_distribution
+    global_class_weights = torch.tensor(
+        global_class_weights, dtype=torch.float32, device=device
     )
-    print("balanced_class_weights", balanced_class_weights)
-    weighted_bce_loss = nn.BCELoss(weight=balanced_class_weights)
+    print("balanced_class_weights", global_class_weights)
+    weighted_bce_global_class_weights_loss = nn.BCELoss(weight=global_class_weights)
+
 
 # Load model
 model_name = config["model"]["name"]
@@ -179,6 +182,7 @@ optimizer = optimizer_class(
 # Resume training
 # Get the name of the config file
 config_name = os.path.splitext(os.path.basename(args.config))[0]
+print("config", config_name)
 if args.model_path is None:
     args.model_path = os.path.join("models", config_name)
 
@@ -213,22 +217,27 @@ for epoch in range(start_epoch, num_epochs):
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 0.1  # Set weight for negative samples
                 weights[labels == 1] = 0.9  # Set weight for positive samples
-                weighted_bce_loss = nn.BCELoss(weight=weights)
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
+            elif config["loss"]["weight"] == "global_pn":
+                weights = torch.zeros_like(labels)
+                weights[labels == 0] = neg_weight  # Set weight for negative samples
+                weights[labels == 1] = pos_weight  # Set weight for positive samples
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             elif config["loss"]["weight"] == "balanced_pn":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
-                weighted_bce_loss = nn.BCELoss(weight=weights)
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             elif config["loss"]["weight"] == "balanced_cls":
-                weights = balanced_class_weights
+                weights = global_class_weights
             elif config["loss"]["weight"] == "balanced_pn_cls":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
-                weights = weights * balanced_class_weights
-                weighted_bce_loss = nn.BCELoss(weight=weights)
+                weights = weights * global_class_weights
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             # loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
-            loss = weighted_bce_loss(outputs, labels)
+            loss = weighted_bce_global_class_weights_loss(outputs, labels)
         elif loss_type == "BCE":
             loss = bce_loss(outputs, labels)
         loss.backward()
@@ -269,22 +278,41 @@ for epoch in range(start_epoch, num_epochs):
                         weights[
                             val_labels == 1
                         ] = 0.9  # Set weight for positive samples
-                        weighted_bce_loss = nn.BCELoss(weight=weights)
+                        weighted_bce_global_class_weights_loss = nn.BCELoss(
+                            weight=weights
+                        )
+                    elif config["loss"]["weight"] == "global_pn":
+                        weights = torch.zeros_like(val_labels)
+                        weights[
+                            val_labels == 0
+                        ] = neg_weight  # Set weight for negative samples
+                        weights[
+                            val_labels == 1
+                        ] = pos_weight  # Set weight for positive samples
+                        weighted_bce_global_class_weights_loss = nn.BCELoss(
+                            weight=weights
+                        )
                     elif config["loss"]["weight"] == "batch_pn":
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
-                        weighted_bce_loss = nn.BCELoss(weight=weights)
+                        weighted_bce_global_class_weights_loss = nn.BCELoss(
+                            weight=weights
+                        )
                     elif config["loss"]["weight"] == "global_class":
-                        weights = balanced_class_weights
+                        weights = global_class_weights
                     elif config["loss"]["weight"] == "combined1":
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
-                        weights = weights * balanced_class_weights
-                        weighted_bce_loss = nn.BCELoss(weight=weights)
+                        weights = weights * global_class_weights
+                        weighted_bce_global_class_weights_loss = nn.BCELoss(
+                            weight=weights
+                        )
                     # loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
-                    loss = weighted_bce_loss(val_outputs, val_labels)
+                    loss = weighted_bce_global_class_weights_loss(
+                        val_outputs, val_labels
+                    )
                 elif loss_type == "BCE":
                     loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
@@ -357,7 +385,13 @@ for epoch in range(start_epoch, num_epochs):
                 "precision": precision,
                 "recall": recall,
                 "f1": f1,
+                "epoch": epoch + 1,
             }
+
+            # Save the best model
+            best_model_file = os.path.join(model_path, "model_best.pt")
+            save_checkpoint(model, epoch + 1, best_model_file, optimizer, val_loss)
+
         else:
             early_stopping_counter += 1
             print(
@@ -374,6 +408,6 @@ writer.close()
 print("Finished training")
 
 # Save the best_writer_values to a text file
-with open(os.path.join(model_path, "best_writer_values.txt") , "w") as f:
+with open(os.path.join(model_path, "best_writer_values.txt"), "w") as f:
     for key, value in best_writer_values.items():
         f.write(f"{key}: {value}\n")
