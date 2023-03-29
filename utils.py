@@ -132,6 +132,7 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
 
     print(f"precision: {precision_sum}, recall: {recall_sum}")
     print(f"f1: {f1_sum}")
+    return precision_sum, recall_sum, f1_sum
 
 
 def calculate_roc_auc(tp, fp, fn, tn):

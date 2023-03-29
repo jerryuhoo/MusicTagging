@@ -230,11 +230,11 @@ class FCN(nn.Module):
         # self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
 
         # FCN long
-        self.layer1 = Conv_2d(1, 64, pooling=(2,4))
-        self.layer2 = Conv_2d(64, 128, pooling=(2,4))
-        self.layer3 = Conv_2d(128, 128, pooling=(2,4))
-        self.layer4 = Conv_2d(128, 128, pooling=(3,5))
-        self.layer5 = Conv_2d(128, 64, pooling=(4,4))
+        self.layer1 = Conv_2d(1, 64, pooling=(2, 4))
+        self.layer2 = Conv_2d(64, 128, pooling=(2, 4))
+        self.layer3 = Conv_2d(128, 128, pooling=(2, 4))
+        self.layer4 = Conv_2d(128, 128, pooling=(3, 5))
+        self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
 
         # Dense
         self.dense = nn.Linear(64, n_class)
@@ -243,7 +243,7 @@ class FCN(nn.Module):
     def forward(self, x):
         # Spectrogram
         # print(x.shape)
-        x = self.to_db(x)
+        # x = self.to_db(x)
         # print(x.shape)
         x = x.unsqueeze(1)
         # print(x.shape)
@@ -271,53 +271,62 @@ class FCN(nn.Module):
 
         return x
 
+
 class ShortChunkCNN(nn.Module):
-    '''
+    """
     Short-chunk CNN architecture.
     So-called vgg-ish model with a small receptive field.
     Deeper layers, smaller pooling (2x2).
-    '''
-    def __init__(self,
-                n_channels=128,
-                sample_rate=16000,
-                n_fft=512,
-                f_min=0.0,
-                f_max=8000.0,
-                n_mels=128,
-                n_class=50):
+    """
+
+    def __init__(
+        self,
+        n_channels=128,
+        sample_rate=16000,
+        n_fft=512,
+        f_min=0.0,
+        f_max=8000.0,
+        n_mels=128,
+        n_class=50,
+    ):
         super(ShortChunkCNN, self).__init__()
 
         # Spectrogram
-        self.spec = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate,
-                                                         n_fft=n_fft,
-                                                         f_min=f_min,
-                                                         f_max=f_max,
-                                                         n_mels=n_mels)
+        self.spec = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            f_min=f_min,
+            f_max=f_max,
+            n_mels=n_mels,
+        )
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
 
         # CNN
         self.layer1 = Conv_2d(1, n_channels, pooling=2)
         self.layer2 = Conv_2d(n_channels, n_channels, pooling=2)
-        self.layer3 = Conv_2d(n_channels, n_channels*2, pooling=2)
-        self.layer4 = Conv_2d(n_channels*2, n_channels*2, pooling=2)
-        self.layer5 = Conv_2d(n_channels*2, n_channels*2, pooling=2)
-        self.layer6 = Conv_2d(n_channels*2, n_channels*2, pooling=2)
-        self.layer7 = Conv_2d(n_channels*2, n_channels*4, pooling=2)
+        self.layer3 = Conv_2d(n_channels, n_channels * 2, pooling=2)
+        self.layer4 = Conv_2d(n_channels * 2, n_channels * 2, pooling=2)
+        self.layer5 = Conv_2d(n_channels * 2, n_channels * 2, pooling=2)
+        self.layer6 = Conv_2d(n_channels * 2, n_channels * 2, pooling=2)
+        self.layer7 = Conv_2d(n_channels * 2, n_channels * 4, pooling=2)
 
         # Dense
-        self.dense1 = nn.Linear(n_channels*4, n_channels*4)
-        self.bn = nn.BatchNorm1d(n_channels*4)
-        self.dense2 = nn.Linear(n_channels*4, n_class)
+        self.dense1 = nn.Linear(n_channels * 4, n_channels * 4)
+        self.bn = nn.BatchNorm1d(n_channels * 4)
+        self.dense2 = nn.Linear(n_channels * 4, n_class)
         self.dropout = nn.Dropout(0.5)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         # Spectrogram
         # x = self.spec(x)
-        x = self.to_db(x)
+        # print("x11", x)
+        # x = self.to_db(x)
+        # print("x22", x)
         x = x.unsqueeze(1)
         x = self.spec_bn(x)
+        # print("x33", x)
 
         # CNN
         x = self.layer1(x)

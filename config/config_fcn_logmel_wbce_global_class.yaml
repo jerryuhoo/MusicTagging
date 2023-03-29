@@ -2,7 +2,7 @@
 feature_length: 30
 feature_type: log_mel
 learning_rate: 0.0001
-batch_size: 32
+batch_size: 16
 num_epochs: 50
 
 saved_models_count: 0
@@ -33,7 +33,7 @@ optimizer:
 
 loss:
   type: weightedBCE # BCE / weightedBCE
-  weight: balanced_pn_cls # fixed / balanced_cls / balanced_pn / balanced_pn_cls
+  weight: global_class # fixed / batch_pn / global_class / combined1
 # trainer
 # trainer:
 #   gpus: 1

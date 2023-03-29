@@ -5,12 +5,15 @@ import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader, random_split
 import os
+import shutil
 import time
 from dataset import HDF5Dataset, HDF5DataLoader
+
 # from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 from tqdm import tqdm
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
+import argparse
 import yaml
 import pandas as pd
 import sys
@@ -24,29 +27,49 @@ from utils import (
     compute_confusion_matrix,
     log_confusion_matrix,
     get_auc,
-    get_model
+    get_model,
 )
 
 
 device = check_device()
 
+# Define early stopping parameters
+patience = 5
+early_stopping_counter = 0
+best_val_loss = float("inf")
+
+# parse arguments
+parser = argparse.ArgumentParser(description="Training script.")
+parser.add_argument(
+    "--config",
+    type=str,
+    default="config/config_fcn.yaml",
+    help="Path to configuration file.",
+)
+parser.add_argument(
+    "--model_path",
+    type=str,
+    default=None,
+    help="Directory to save the trained model.",
+)
+args = parser.parse_args()
 
 # load configuration file
-with open('config/config_fcn.yaml', 'r') as f:
+with open(args.config, "r") as f:
     config = yaml.safe_load(f)
 
 # Define the hyperparameters
-feature_length = config['feature_length']
-learning_rate = config['learning_rate']
-batch_size = config['batch_size']
-num_epochs = config['num_epochs']
-saved_models_count = config['saved_models_count']
-max_models_saved = config['max_models_saved']
-save_interval = config['save_interval']
-num_workers = config['num_workers']
-csv_dir = config['dataset']['csv_dir']
+feature_length = config["feature_length"]
+learning_rate = config["learning_rate"]
+batch_size = config["batch_size"]
+num_epochs = config["num_epochs"]
+saved_models_count = config["saved_models_count"]
+max_models_saved = config["max_models_saved"]
+save_interval = config["save_interval"]
+num_workers = config["num_workers"]
+csv_dir = config["dataset"]["csv_dir"]
 
-feature_type = config['feature_type']
+feature_type = config["feature_type"]
 
 preprocessed_path = "preprocessed/" + str(feature_length) + "/"
 
@@ -100,7 +123,7 @@ num_classes = len(label_names) - 2
 print("num_classes", num_classes)
 
 
-if config['loss']['type'] == "weightedBCE":
+if config["loss"]["type"] == "weightedBCE":
     # Get the targets from the dataset
     num_samples = 0
     label_count = torch.zeros(num_classes)
@@ -117,22 +140,24 @@ if config['loss']['type'] == "weightedBCE":
     pos_weight = (total_labels - num_pos) / total_labels
     print("pos_weight", pos_weight)
     balanced_class_weights = 1.0 - label_distribution
-    balanced_class_weights = torch.tensor(balanced_class_weights, dtype=torch.float32, device=device)
+    balanced_class_weights = torch.tensor(
+        balanced_class_weights, dtype=torch.float32, device=device
+    )
     print("balanced_class_weights", balanced_class_weights)
     weighted_bce_loss = nn.BCELoss(weight=balanced_class_weights)
 
 # Load model
-model_name = config['model']['name']
-loss_type = config['loss']['type']
+model_name = config["model"]["name"]
+loss_type = config["loss"]["type"]
 model = get_model(config)
 model = model.to(device)
 print(model)
 
-if loss_type == 'BCE':
+if loss_type == "BCE":
     bce_loss = nn.BCELoss()
-    loss_type2 = 'BCE'
-elif loss_type == 'weightedBCE':
-    loss_type2 = 'weightedBCE_' + config['loss']['weight']
+    loss_type2 = "BCE"
+elif loss_type == "weightedBCE":
+    loss_type2 = "weightedBCE_" + config["loss"]["weight"]
 
 print("loss", loss_type2)
 # Define the loss function
@@ -141,18 +166,29 @@ print("loss", loss_type2)
 # criterion = nn.BCEWithLogitsLoss(pos_weight=weights, reduction="none")
 
 # parse optimizer settings
-optimizer_name = config['optimizer']['name']
-optimizer_lr = config['optimizer']['lr']
-optimizer_weight_decay = config['optimizer']['weight_decay']
+optimizer_name = config["optimizer"]["name"]
+optimizer_lr = config["optimizer"]["lr"]
+optimizer_weight_decay = config["optimizer"]["weight_decay"]
 
 # create optimizer
 optimizer_class = getattr(optim, optimizer_name)
-optimizer = optimizer_class(model.parameters(), lr=optimizer_lr, weight_decay=optimizer_weight_decay)
+optimizer = optimizer_class(
+    model.parameters(), lr=optimizer_lr, weight_decay=optimizer_weight_decay
+)
 
 # Resume training
-model_path = "models/" + model_name + "_" + loss_type2 + "_" + str(optimizer_name) + "_" + str(learning_rate)  + "_" + feature_type + "_" + str(feature_length)
+# Get the name of the config file
+config_name = os.path.splitext(os.path.basename(args.config))[0]
+if args.model_path is None:
+    args.model_path = os.path.join("models", config_name)
+
+model_path = args.model_path
+
 if not os.path.exists(model_path):
     os.makedirs(model_path)
+
+shutil.copy2(args.config, os.path.join(model_path, "config.yaml"))
+
 best_model_path = load_best_model(model, model_path)
 model, optimizer, start_epoch, loss = resume_training(model, optimizer, best_model_path)
 
@@ -172,20 +208,20 @@ for epoch in range(start_epoch, num_epochs):
         labels = labels.to(device).float()
         optimizer.zero_grad()
         outputs = model(inputs)
-        if loss_type == 'weightedBCE':
-            if config['loss']['weight'] == 'fixed':
+        if loss_type == "weightedBCE":
+            if config["loss"]["weight"] == "fixed":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 0.1  # Set weight for negative samples
                 weights[labels == 1] = 0.9  # Set weight for positive samples
                 weighted_bce_loss = nn.BCELoss(weight=weights)
-            elif config['loss']['weight'] == 'balanced_pn':
+            elif config["loss"]["weight"] == "balanced_pn":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
                 weighted_bce_loss = nn.BCELoss(weight=weights)
-            elif config['loss']['weight'] == 'balanced_cls':
+            elif config["loss"]["weight"] == "balanced_cls":
                 weights = balanced_class_weights
-            elif config['loss']['weight'] == 'balanced_pn_cls':
+            elif config["loss"]["weight"] == "balanced_pn_cls":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
@@ -193,7 +229,7 @@ for epoch in range(start_epoch, num_epochs):
                 weighted_bce_loss = nn.BCELoss(weight=weights)
             # loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
             loss = weighted_bce_loss(outputs, labels)
-        elif loss_type == 'BCE':
+        elif loss_type == "BCE":
             loss = bce_loss(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -224,20 +260,24 @@ for epoch in range(start_epoch, num_epochs):
                 val_inputs = val_inputs.to(device)
                 val_labels = val_labels.to(device).float()
                 val_outputs = model(val_inputs)
-                if loss_type == 'weightedBCE':
-                    if config['loss']['weight'] == 'fixed':
+                if loss_type == "weightedBCE":
+                    if config["loss"]["weight"] == "fixed":
                         weights = torch.zeros_like(val_labels)
-                        weights[val_labels == 0] = 0.1  # Set weight for negative samples
-                        weights[val_labels == 1] = 0.9  # Set weight for positive samples
+                        weights[
+                            val_labels == 0
+                        ] = 0.1  # Set weight for negative samples
+                        weights[
+                            val_labels == 1
+                        ] = 0.9  # Set weight for positive samples
                         weighted_bce_loss = nn.BCELoss(weight=weights)
-                    elif config['loss']['weight'] == 'balanced_pn':
+                    elif config["loss"]["weight"] == "batch_pn":
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
                         weighted_bce_loss = nn.BCELoss(weight=weights)
-                    elif config['loss']['weight'] == 'balanced_cls':
+                    elif config["loss"]["weight"] == "global_class":
                         weights = balanced_class_weights
-                    elif config['loss']['weight'] == 'balanced_pn_cls':
+                    elif config["loss"]["weight"] == "combined1":
                         weights = torch.zeros_like(val_labels)
                         weights[val_labels == 0] = 1 - pos_weight
                         weights[val_labels == 1] = pos_weight
@@ -245,7 +285,7 @@ for epoch in range(start_epoch, num_epochs):
                         weighted_bce_loss = nn.BCELoss(weight=weights)
                     # loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
                     loss = weighted_bce_loss(val_outputs, val_labels)
-                elif loss_type == 'BCE':
+                elif loss_type == "BCE":
                     loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
                 total += val_labels.numel()
@@ -278,7 +318,9 @@ for epoch in range(start_epoch, num_epochs):
             roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
             writer.add_scalar(f"val/roc_auc", roc_auc, epoch + 1)
             writer.add_scalar(f"val/pr_auc", pr_auc, epoch + 1)
-            log_confusion_matrix(writer, confusion_matrix, label_names, epoch + 1)
+            precision, recall, f1 = log_confusion_matrix(
+                writer, confusion_matrix, label_names, epoch + 1
+            )
         # save model
         if saved_models_count < max_models_saved:
             model_file = os.path.join(
@@ -300,8 +342,38 @@ for epoch in range(start_epoch, num_epochs):
                 model_path, "model_epoch_{}.pt".format((epoch + 1))
             )
             save_checkpoint(model, epoch + 1, model_file, optimizer, val_loss)
+        # Early stopping
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            early_stopping_counter = 0
+
+            # Save best writer values
+            best_writer_values = {
+                "train_loss": training_loss,
+                "val_loss": val_loss,
+                "val_accuracy": val_acc,
+                "roc_auc": roc_auc,
+                "pr_auc": pr_auc,
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+            }
+        else:
+            early_stopping_counter += 1
+            print(
+                f"No improvement in validation loss. Early stopping counter: {early_stopping_counter}/{patience}"
+            )
+
+        if early_stopping_counter >= patience:
+            print("Early stopping triggered. Stopping training.")
+            break
         model.train()
 
 # Close the TensorBoard writer
 writer.close()
 print("Finished training")
+
+# Save the best_writer_values to a text file
+with open(os.path.join(model_path, "best_writer_values.txt") , "w") as f:
+    for key, value in best_writer_values.items():
+        f.write(f"{key}: {value}\n")
