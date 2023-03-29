@@ -224,33 +224,24 @@ for epoch in range(start_epoch, num_epochs):
         if loss_type == "weightedBCE":
             if config["loss"]["weight"] == "fixed":
                 weights = torch.zeros_like(labels)
-                weights[
-                    labels == 0
-                ] = 0.1  # Set weight for negative samples
-                weights[
-                    labels == 1
-                ] = 0.9  # Set weight for positive samples
-                weighted_bce_global_class_weights_loss = nn.BCELoss(
-                    weight=weights
-                )
+                weights[labels == 0] = 0.1  # Set weight for negative samples
+                weights[labels == 1] = 0.9  # Set weight for positive samples
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             elif config["loss"]["weight"] == "global_pn":
                 weights = torch.zeros_like(labels)
-                weights[
-                    labels == 0
-                ] = neg_weight  # Set weight for negative samples
-                weights[
-                    labels == 1
-                ] = pos_weight  # Set weight for positive samples
-                weighted_bce_global_class_weights_loss = nn.BCELoss(
-                    weight=weights
-                )
+                weights[labels == 0] = neg_weight
+                weights[labels == 1] = pos_weight
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             elif config["loss"]["weight"] == "batch_pn":
                 weights = torch.zeros_like(labels)
-                weights[labels == 0] = 1 - pos_weight
-                weights[labels == 1] = pos_weight
-                weighted_bce_global_class_weights_loss = nn.BCELoss(
-                    weight=weights
-                )
+                total_labels_in_batch = labels.size(0) * labels.size(1)
+                num_positives = torch.sum(labels)
+                num_negatives = total_labels_in_batch - num_positives
+                pos_weight_batch = num_negatives / total_labels_in_batch
+                neg_weight_batch = num_positives / total_labels_in_batch
+                weights[labels == 0] = 1 - pos_weight_batch
+                weights[labels == 1] = pos_weight_batch
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             elif config["loss"]["weight"] == "global_class":
                 weights = global_class_weights
             elif config["loss"]["weight"] == "combined1":
@@ -258,9 +249,7 @@ for epoch in range(start_epoch, num_epochs):
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
                 weights = weights * global_class_weights
-                weighted_bce_global_class_weights_loss = nn.BCELoss(
-                    weight=weights
-                )
+                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
             # elif config["loss"]["weight"] == "combined2":
             #     weights = torch.zeros_like(labels)
             #     weights[labels == 0] = 1 - pos_weight
@@ -329,8 +318,13 @@ for epoch in range(start_epoch, num_epochs):
                         )
                     elif config["loss"]["weight"] == "batch_pn":
                         weights = torch.zeros_like(val_labels)
-                        weights[val_labels == 0] = 1 - pos_weight
-                        weights[val_labels == 1] = pos_weight
+                        total_labels_in_batch = val_labels.size(0) * val_labels.size(1)
+                        num_positives = torch.sum(val_labels)
+                        num_negatives = total_labels_in_batch - num_positives
+                        pos_weight_batch = num_negatives / total_labels_in_batch
+                        neg_weight_batch = num_positives / total_labels_in_batch
+                        weights[val_labels == 0] = 1 - pos_weight_batch
+                        weights[val_labels == 1] = pos_weight_batch
                         weighted_bce_global_class_weights_loss = nn.BCELoss(
                             weight=weights
                         )
