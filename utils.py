@@ -5,11 +5,15 @@ import numpy as np
 from sklearn import metrics
 from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 
-def load_best_model(model, path):
+
+def load_last_model(model, path):
     models = [f for f in os.listdir(path) if f.endswith(".pt")]
     best_epoch = 0
     best_model_path = None
     for m in models:
+        # skip best.pt
+        if "best" in m:
+            continue
         epoch = int(m.split("_")[-1].split(".")[0])
         if epoch > best_epoch:
             best_epoch = epoch
@@ -151,42 +155,43 @@ def get_auc(y_true, y_score):
     print("pr_auc: %.4f" % pr_aucs)
     return roc_aucs, pr_aucs
 
+
 def get_model(config):
-    if config['model']['name'] == 'FCN':
+    if config["model"]["name"] == "FCN":
         return FCN(
-            sample_rate=config['model']['sample_rate'], 
-            n_fft=config['model']['n_fft'], 
-            f_min=config['model']['f_min'], 
-            f_max=config['model']['f_max'], 
-            n_mels=config['model']['n_mels'], 
-            n_class=config['dataset']['num_classes'], 
+            sample_rate=config["model"]["sample_rate"],
+            n_fft=config["model"]["n_fft"],
+            f_min=config["model"]["f_min"],
+            f_max=config["model"]["f_max"],
+            n_mels=config["model"]["n_mels"],
+            n_class=config["dataset"]["num_classes"],
         )
-    elif config['model']['name'] == 'CRNN':
+    elif config["model"]["name"] == "CRNN":
         return CRNN(
-            sample_rate=config['model']['sample_rate'], 
-            n_fft=config['model']['n_fft'], 
-            f_min=config['model']['f_min'], 
-            f_max=config['model']['f_max'], 
-            n_mels=config['model']['n_mels'], 
-            n_class=config['dataset']['num_classes'], 
+            sample_rate=config["model"]["sample_rate"],
+            n_fft=config["model"]["n_fft"],
+            f_min=config["model"]["f_min"],
+            f_max=config["model"]["f_max"],
+            n_mels=config["model"]["n_mels"],
+            n_class=config["dataset"]["num_classes"],
         )
-    elif config['model']['name'] == 'HarmonicCNN':
+    elif config["model"]["name"] == "HarmonicCNN":
         return HarmonicCNN(
-            sample_rate=config['model']['sample_rate'], 
-            n_fft=config['model']['n_fft'], 
-            f_min=config['model']['f_min'], 
-            f_max=config['model']['f_max'], 
-            n_mels=config['model']['n_mels'], 
-            n_class=config['dataset']['num_classes'], 
+            sample_rate=config["model"]["sample_rate"],
+            n_fft=config["model"]["n_fft"],
+            f_min=config["model"]["f_min"],
+            f_max=config["model"]["f_max"],
+            n_mels=config["model"]["n_mels"],
+            n_class=config["dataset"]["num_classes"],
         )
-    elif config['model']['name'] == 'ShortChunkCNN':
+    elif config["model"]["name"] == "ShortChunkCNN":
         return ShortChunkCNN(
-            sample_rate=config['model']['sample_rate'], 
-            n_fft=config['model']['n_fft'], 
-            f_min=config['model']['f_min'], 
-            f_max=config['model']['f_max'], 
-            n_mels=config['model']['n_mels'], 
-            n_class=config['dataset']['num_classes'], 
+            sample_rate=config["model"]["sample_rate"],
+            n_fft=config["model"]["n_fft"],
+            f_min=config["model"]["f_min"],
+            f_max=config["model"]["f_max"],
+            n_mels=config["model"]["n_mels"],
+            n_class=config["dataset"]["num_classes"],
         )
     else:
-        raise ValueError('Unknown model name: {}'.format(config['model']['name']))
+        raise ValueError("Unknown model name: {}".format(config["model"]["name"]))

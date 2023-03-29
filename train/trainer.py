@@ -20,7 +20,7 @@ import sys
 
 sys.path.append(".")
 from utils import (
-    load_best_model,
+    load_last_model,
     resume_training,
     save_checkpoint,
     check_device,
@@ -33,10 +33,6 @@ from utils import (
 
 device = check_device()
 
-# Define early stopping parameters
-patience = 5
-early_stopping_counter = 0
-best_val_loss = float("inf")
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Training script.")
@@ -52,7 +48,18 @@ parser.add_argument(
     default=None,
     help="Directory to save the trained model.",
 )
+parser.add_argument(
+    "--patience",
+    type=int,
+    default=5,
+    help="Number of epochs to wait before early stopping.",
+)
 args = parser.parse_args()
+
+# Define early stopping parameters
+patience = args.patience
+early_stopping_counter = 0
+best_val_loss = float("inf")
 
 # load configuration file
 with open(args.config, "r") as f:
@@ -113,7 +120,9 @@ print("train_len", train_len)
 print("val_len", val_len)
 print("test_len", test_len)
 
-train_loader = HDF5DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers)
+train_loader = HDF5DataLoader(
+    train_dataset, batch_size=batch_size, num_workers=num_workers
+)
 val_loader = HDF5DataLoader(val_dataset, batch_size=batch_size, num_workers=num_workers)
 
 df = pd.read_csv(csv_dir, sep="\t")
@@ -193,8 +202,8 @@ if not os.path.exists(model_path):
 
 shutil.copy2(args.config, os.path.join(model_path, "config.yaml"))
 
-best_model_path = load_best_model(model, model_path)
-model, optimizer, start_epoch, loss = resume_training(model, optimizer, best_model_path)
+last_model_path = load_last_model(model, model_path)
+model, optimizer, start_epoch, loss = resume_training(model, optimizer, last_model_path)
 
 # Initialize the TensorBoard writer
 writer = SummaryWriter(log_dir=model_path)
@@ -215,27 +224,53 @@ for epoch in range(start_epoch, num_epochs):
         if loss_type == "weightedBCE":
             if config["loss"]["weight"] == "fixed":
                 weights = torch.zeros_like(labels)
-                weights[labels == 0] = 0.1  # Set weight for negative samples
-                weights[labels == 1] = 0.9  # Set weight for positive samples
-                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
+                weights[
+                    labels == 0
+                ] = 0.1  # Set weight for negative samples
+                weights[
+                    labels == 1
+                ] = 0.9  # Set weight for positive samples
+                weighted_bce_global_class_weights_loss = nn.BCELoss(
+                    weight=weights
+                )
             elif config["loss"]["weight"] == "global_pn":
                 weights = torch.zeros_like(labels)
-                weights[labels == 0] = neg_weight  # Set weight for negative samples
-                weights[labels == 1] = pos_weight  # Set weight for positive samples
-                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
-            elif config["loss"]["weight"] == "balanced_pn":
+                weights[
+                    labels == 0
+                ] = neg_weight  # Set weight for negative samples
+                weights[
+                    labels == 1
+                ] = pos_weight  # Set weight for positive samples
+                weighted_bce_global_class_weights_loss = nn.BCELoss(
+                    weight=weights
+                )
+            elif config["loss"]["weight"] == "batch_pn":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
-                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
-            elif config["loss"]["weight"] == "balanced_cls":
+                weighted_bce_global_class_weights_loss = nn.BCELoss(
+                    weight=weights
+                )
+            elif config["loss"]["weight"] == "global_class":
                 weights = global_class_weights
-            elif config["loss"]["weight"] == "balanced_pn_cls":
+            elif config["loss"]["weight"] == "combined1":
                 weights = torch.zeros_like(labels)
                 weights[labels == 0] = 1 - pos_weight
                 weights[labels == 1] = pos_weight
                 weights = weights * global_class_weights
-                weighted_bce_global_class_weights_loss = nn.BCELoss(weight=weights)
+                weighted_bce_global_class_weights_loss = nn.BCELoss(
+                    weight=weights
+                )
+            # elif config["loss"]["weight"] == "combined2":
+            #     weights = torch.zeros_like(labels)
+            #     weights[labels == 0] = 1 - pos_weight
+            #     weights[labels == 1] = pos_weight
+            #     weights = weights * global_class_weights
+            #     weighted_bce_global_class_weights_loss = nn.BCELoss(
+            #         weight=weights
+            #     )
+            else:
+                raise ValueError("Invalid weight type")
             # loss = F.binary_cross_entropy_with_logits(outputs, labels, weight=weights)
             loss = weighted_bce_global_class_weights_loss(outputs, labels)
         elif loss_type == "BCE":
@@ -309,10 +344,21 @@ for epoch in range(start_epoch, num_epochs):
                         weighted_bce_global_class_weights_loss = nn.BCELoss(
                             weight=weights
                         )
+                    # elif config["loss"]["weight"] == "combined2":
+                    #     weights = torch.zeros_like(val_labels)
+                    #     weights[val_labels == 0] = 1 - pos_weight
+                    #     weights[val_labels == 1] = pos_weight
+                    #     weights = weights * global_class_weights
+                    #     weighted_bce_global_class_weights_loss = nn.BCELoss(
+                    #         weight=weights
+                    #     )
+                    else:
+                        raise ValueError("Invalid weight type")
                     # loss = F.binary_cross_entropy_with_logits(val_outputs, val_labels, weight=weights)
                     loss = weighted_bce_global_class_weights_loss(
                         val_outputs, val_labels
                     )
+
                 elif loss_type == "BCE":
                     loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
