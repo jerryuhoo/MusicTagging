@@ -1,0 +1,42 @@
+# hyperparameters
+feature_length: 10
+feature_type: log_mel
+learning_rate: 0.0001
+batch_size: 16
+num_epochs: 100
+
+saved_models_count: 0
+max_models_saved: 10
+save_interval: 5
+num_workers: 8
+
+# model architecture
+model:
+  name: ShortChunkCNN
+  sample_rate: 16000
+  n_fft: 256
+  f_min: 0.0
+  f_max: 8000.0
+  n_mels: 128
+  dropout_rate: 0.5
+# dataset
+dataset:
+  name: mtat
+  csv_dir: ../data/magnatagatune/annotations_final_new.csv
+  num_classes: 50
+
+# optimizer
+optimizer:
+  name: AdamW
+  lr: 0.0001
+  weight_decay: 0.0001
+
+loss:
+  type: weightedBCE # BCE / weightedBCE
+  weight: global_pn # fixed / batch_pn / global_class / combined1
+# trainer
+# trainer:
+#   gpus: 1
+#   checkpoint_callback: True
+#   early_stop_callback: True
+  
