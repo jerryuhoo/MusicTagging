@@ -25,13 +25,19 @@ pip install -r requirements.txt
 python preprocess.py
 ```
 ## Training
+
+## Auto training
+```bash
+python autotrain.py
+```
+
 ### SVM
 ```bash
 python train_svm.py
 ```
 
-### DNN
+### FCN
 ```bash
-python train/trainer.py
+python train/trainer.py --config="config/config_fcn_logmel_bce.yaml"
 ```
 

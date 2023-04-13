@@ -40,9 +40,13 @@ def preprocess_segment(args):
     song_dir, row_idx, row, sr, window_length, step, save_dir = args
     # print("row_idx",row_idx)
     if song_dir == "../data/magnatagatune/mp3/":
-        audio_path = os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".mp3"
+        audio_path = (
+            os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".mp3"
+        )
     elif song_dir == "../data/magnatagatune/wav/":
-        audio_path = os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".wav"
+        audio_path = (
+            os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".wav"
+        )
     else:
         raise ValueError("song_dir should be either mp3 or wav")
     try:
@@ -78,6 +82,254 @@ def preprocess_segment(args):
             )
     except Exception:
         print("error: {}".format(audio_path))
+
+
+# def process_song(args):
+#     mp3_path, label, total_len, win_len, step_len = args
+#     y, sr = librosa.load(mp3_path)
+
+#     padded_y = np.pad(y, (0, total_len * sr - len(y)), "constant")
+#     num_segments = (len(padded_y) - win_len * sr) // (step_len * sr) + 1
+
+#     log_mel_list = []
+#     label_list = []
+#     for _ in range(num_segments):
+#         start = _ * step_len * sr
+#         end = start + win_len * sr
+#         segment = padded_y[start:end]
+
+#         log_mel_spec = extract_log_mel(segment, sr)
+#         log_mel_list.append(log_mel_spec)
+#         label_list.append(label)
+#     return log_mel_list, label_list
+
+
+# def process_directory(
+#     data_dir, save_dir, binary_data, song_dir, n_workers, total_len, win_len, step_len
+# ):
+#     data = np.load(data_dir)
+#     total_length = len(data)
+
+#     with multiprocessing.Pool(n_workers) as pool:
+#         log_mel_list = []
+#         label_list = []
+#         mp3_paths = []
+#         labels = []
+
+#         for mp3_path in data:
+#             index, mp3_path = mp3_path.split("\t")
+#             mp3_path = os.path.join(song_dir, mp3_path)
+#             mp3_paths.append(mp3_path)
+#             labels.append(binary_data[int(index)])
+
+#         args = [
+#             (mp3_path, label, total_len, win_len, step_len)
+#             for mp3_path, label in zip(mp3_paths, labels)
+#         ]
+
+#         for result in tqdm(
+#             pool.imap(process_song, args),
+#             total=total_length,
+#             desc=f"Processing {data_dir}",
+#         ):
+#             log_mel, label = result
+#             log_mel_list.extend(log_mel)
+#             label_list.extend(label)
+
+#     with h5py.File(os.path.join(save_dir, "log_mel.h5"), "w") as hf:
+#         hf.create_dataset("log_mel", data=np.array(log_mel_list))
+
+#     with h5py.File(os.path.join(save_dir, "label.h5"), "w") as hf:
+#         hf.create_dataset("label", data=np.array(label_list))
+
+
+def process_song(args):
+    row_idx, mp3_path, label, total_len, win_len, step_len, save_dir, sr = args
+    y, _ = librosa.load(mp3_path, sr=sr)
+    padded_y = np.pad(y, (0, total_len * sr - len(y)), "constant")
+    num_segments = (len(padded_y) - win_len * sr) // (step_len * sr) + 1
+
+    for seg_idx in range(num_segments):
+        start = seg_idx * step_len * sr
+        end = start + win_len * sr
+        segment = padded_y[start:end]
+
+        log_mel_spec = extract_log_mel(segment, sr)
+        np.save(
+            os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"),
+            log_mel_spec,
+        )
+        np.save(
+            os.path.join(save_dir, "label", f"label_{row_idx}_{seg_idx}.npy"), label
+        )
+
+
+def process_directory(
+    data_dir,
+    save_dir,
+    binary_data,
+    song_dir,
+    n_workers,
+    total_len,
+    win_len,
+    step_len,
+    sample_rate,
+):
+    data = np.load(data_dir)
+    total_length = len(data)
+
+    os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
+    os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
+
+    with multiprocessing.Pool(n_workers) as pool:
+        mp3_paths = []
+        labels = []
+
+        for mp3_path in data:
+            index, mp3_path = mp3_path.split("\t")
+            mp3_path = os.path.join(song_dir, mp3_path)
+            mp3_paths.append(mp3_path)
+            labels.append(binary_data[int(index)])
+
+        args = [
+            (
+                row_idx,
+                mp3_path,
+                label,
+                total_len,
+                win_len,
+                step_len,
+                save_dir,
+                sample_rate,
+            )
+            for row_idx, (mp3_path, label) in enumerate(zip(mp3_paths, labels))
+        ]
+
+        list(
+            tqdm(
+                pool.imap(process_song, args),
+                total=total_length,
+                desc=f"Processing {data_dir}",
+            )
+        )
+
+
+def preprocess_data_sota(
+    song_dir,
+    binary_dir,
+    tags_dir,
+    test_dir,
+    train_dir,
+    valid_dir,
+    save_base_dir,
+    n_workers=2,
+    win_len=30,
+    step_len=30,
+    total_len=30,
+    sample_rate=16000,
+):
+    os.makedirs(os.path.join(save_base_dir, "training"), exist_ok=True)
+    os.makedirs(os.path.join(save_base_dir, "validation"), exist_ok=True)
+    os.makedirs(os.path.join(save_base_dir, "testing"), exist_ok=True)
+
+    binary_data = np.load(binary_dir)
+    tags_data = np.load(tags_dir)
+
+    process_directory(
+        train_dir,
+        os.path.join(save_base_dir, "training"),
+        binary_data,
+        song_dir,
+        n_workers,
+        total_len,
+        win_len,
+        step_len,
+        sample_rate,
+    )
+    process_directory(
+        valid_dir,
+        os.path.join(save_base_dir, "validation"),
+        binary_data,
+        song_dir,
+        n_workers,
+        total_len,
+        win_len,
+        step_len,
+        sample_rate,
+    )
+    process_directory(
+        test_dir,
+        os.path.join(save_base_dir, "testing"),
+        binary_data,
+        song_dir,
+        n_workers,
+        total_len,
+        win_len,
+        step_len,
+        sample_rate,
+    )
+
+
+# def preprocess_data_sota(
+#     song_dir,
+#     binary_dir,
+#     tags_dir,
+#     test_dir,
+#     train_dir,
+#     valid_dir,
+#     save_base_dir,
+#     n_workers=2,
+#     win_len=30,
+#     step_len=30,
+#     total_len=30,
+# ):
+#     os.makedirs(os.path.join(save_base_dir, "training"), exist_ok=True)
+#     os.makedirs(os.path.join(save_base_dir, "validation"), exist_ok=True)
+#     os.makedirs(os.path.join(save_base_dir, "testing"), exist_ok=True)
+
+#     def process_directory(data_dir, save_dir, binary_data, song_dir):
+#         log_mel_list = []
+#         label_list = []
+#         data = np.load(data_dir)
+#         total_length = len(data)
+
+#         for i, mp3_path in tqdm(
+#             enumerate(data), desc=f"Processing {data_dir}", total=total_length
+#         ):
+#             index, mp3_path = mp3_path.split("\t")
+#             mp3_path = os.path.join(song_dir, mp3_path)
+#             y, sr = librosa.load(mp3_path)
+
+#             padded_y = np.pad(y, (0, total_len * sr - len(y)), "constant")
+#             num_segments = (len(padded_y) - win_len * sr) // (step_len * sr) + 1
+
+#             for _ in range(num_segments):
+#                 start = _ * step_len * sr
+#                 end = start + win_len * sr
+#                 segment = padded_y[start:end]
+
+#                 log_mel_spec = extract_log_mel(segment, sr)
+#                 log_mel_list.append(log_mel_spec)
+#                 label_list.append(binary_data[i][1:])
+
+#         with h5py.File(os.path.join(save_dir, "log_mel.h5"), "w") as hf:
+#             hf.create_dataset("log_mel", data=np.array(log_mel_list))
+
+#         with h5py.File(os.path.join(save_dir, "label.h5"), "w") as hf:
+#             hf.create_dataset("label", data=np.array(label_list))
+
+#     binary_data = np.load(binary_dir)
+#     tags_data = np.load(tags_dir)
+
+#     process_directory(
+#         train_dir, os.path.join(save_base_dir, "training"), binary_data, song_dir
+#     )
+#     process_directory(
+#         valid_dir, os.path.join(save_base_dir, "validation"), binary_data, song_dir
+#     )
+#     process_directory(
+#         test_dir, os.path.join(save_base_dir, "testing"), binary_data, song_dir
+#     )
 
 
 def preprocess_data(
