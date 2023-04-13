@@ -41,3 +41,8 @@ python train_svm.py
 python train/trainer.py --config="config/config_fcn_logmel_bce.yaml"
 ```
 
+## Inference
+```bash
+python infer.py --model_folder="models/config_fcn_logmel_bce"
+```
+

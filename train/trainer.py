@@ -107,18 +107,11 @@ val_dataset = HDF5Dataset(
     feature_type=feature_type,
 )
 
-test_dataset = HDF5Dataset(
-    feature_h5_path=test_feature_h5_path,
-    label_h5_path=test_label_h5_path,
-    feature_type=feature_type,
-)
 
 train_len = len(train_dataset)
 val_len = len(val_dataset)
-test_len = len(test_dataset)
 print("train_len", train_len)
 print("val_len", val_len)
-print("test_len", test_len)
 
 train_loader = HDF5DataLoader(
     train_dataset, batch_size=batch_size, num_workers=num_workers
@@ -202,7 +195,7 @@ if not os.path.exists(model_path):
 
 shutil.copy2(args.config, os.path.join(model_path, "config.yaml"))
 
-last_model_path = load_last_model(model, model_path)
+last_model_path = load_last_model(model_path)
 model, optimizer, start_epoch, loss = resume_training(model, optimizer, last_model_path)
 
 # Initialize the TensorBoard writer
@@ -448,6 +441,6 @@ writer.close()
 print("Finished training")
 
 # Save the best_writer_values to a text file
-with open(os.path.join(model_path, "best_writer_values.txt"), "w") as f:
+with open(os.path.join(model_path, "best_writer_values_val.txt"), "w") as f:
     for key, value in best_writer_values.items():
         f.write(f"{key}: {value}\n")

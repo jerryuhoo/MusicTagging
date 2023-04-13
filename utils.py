@@ -3,10 +3,10 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import metrics
-from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
+from train.models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 
 
-def load_last_model(model, path):
+def load_last_model(path):
     models = [f for f in os.listdir(path) if f.endswith(".pt")]
     best_epoch = 0
     best_model_path = None
@@ -81,9 +81,10 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
         precision = tp / (tp + fp)
         recall = tp / (tp + fn)
         f1 = 2 * precision * recall / (precision + recall)
-        writer.add_scalar(f"class_{i}_{label_names[i]}/precision", precision, epoch)
-        writer.add_scalar(f"class_{i}_{label_names[i]}/recall", recall, epoch)
-        writer.add_scalar(f"class_{i}_{label_names[i]}/f1", f1, epoch)
+        if writer is not None:
+            writer.add_scalar(f"class_{i}_{label_names[i]}/precision", precision, epoch)
+            writer.add_scalar(f"class_{i}_{label_names[i]}/recall", recall, epoch)
+            writer.add_scalar(f"class_{i}_{label_names[i]}/f1", f1, epoch)
 
     tp_sum = torch.sum(confusion_matrix[:, 0], dim=0)
     fp_sum = torch.sum(confusion_matrix[:, 1], dim=0)
@@ -98,9 +99,10 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
     #     confusion_matrix[:, 2],
     #     confusion_matrix[:, 3],
     # )
-    writer.add_scalar(f"val/precision", precision_sum, epoch)
-    writer.add_scalar(f"val/recall", recall_sum, epoch)
-    writer.add_scalar(f"val/f1", f1_sum, epoch)
+    if writer is not None:
+        writer.add_scalar(f"val/precision", precision_sum, epoch)
+        writer.add_scalar(f"val/recall", recall_sum, epoch)
+        writer.add_scalar(f"val/f1", f1_sum, epoch)
 
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
     # print("confusion_matrix",confusion_matrix)
@@ -132,7 +134,8 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
     image = np.fromstring(fig2.canvas.tostring_rgb(), dtype=np.uint8, sep="")
     image = image.reshape(fig2.canvas.get_width_height()[::-1] + (3,))
     image_tensor = torch.from_numpy(image).permute(2, 0, 1)
-    writer.add_image("Normalized confusion matrix", image_tensor, epoch)
+    if writer is not None:
+        writer.add_image("Normalized confusion matrix", image_tensor, epoch)
 
     print(f"precision: {precision_sum}, recall: {recall_sum}")
     print(f"f1: {f1_sum}")
