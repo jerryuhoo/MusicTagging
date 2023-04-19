@@ -103,7 +103,7 @@ if stage <= 2:
         if delete_npy:
             # delete folders that contains npy files
             print("deleting npy files")
-            for subfolder in ["mfcc", "mfcc_mean", "label", "log_mel"]:
+            for subfolder in ["mfcc", "mfcc_mean", "label", "log_mel", "wav"]:
                 os.system("rm -rf " + save_dir + folder + "/" + subfolder)
 
 
