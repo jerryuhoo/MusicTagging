@@ -10,7 +10,7 @@ import os
 total_len = 30
 delete_npy = False
 stage = 1
-use_sota_data = True
+use_sota_data = False
 sample_rate = 16000
 
 # clean the dataset
@@ -56,10 +56,12 @@ if stage <= 1:
             song_dir,
             csv_dir,
             save_dir,
-            n_workers=2,
+            n_workers=4,
             win_len=30,
             step_len=30,
             total_len=total_len,
+            sample_rate=sample_rate,
+            feature_type="log_mel",
         )
 
 if stage <= 2:
