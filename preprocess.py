@@ -8,8 +8,10 @@ import os
 
 # config
 total_len = 30
+win_len = 10
+step_len = 5
 delete_npy = True
-stage = 2
+stage = 1
 use_sota_data = False
 sample_rate = 16000
 feature_type = "wav"
@@ -46,8 +48,8 @@ if stage <= 1:
             valid_dir,
             save_dir,
             n_workers=4,
-            win_len=30,
-            step_len=30,
+            win_len=win_len,
+            step_len=step_len,
             total_len=total_len,
             sample_rate=sample_rate,
             feature_type=feature_type,
@@ -58,8 +60,8 @@ if stage <= 1:
             csv_dir,
             save_dir,
             n_workers=4,
-            win_len=30,
-            step_len=30,
+            win_len=win_len,
+            step_len=step_len,
             total_len=total_len,
             sample_rate=sample_rate,
             feature_type=feature_type,

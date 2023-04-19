@@ -60,7 +60,9 @@ def process_song(args):
             if feature_type == "log_mel":
                 log_mel_spec = extract_log_mel(segment, sr)
                 np.save(
-                    os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"),
+                    os.path.join(
+                        save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"
+                    ),
                     log_mel_spec,
                 )
             elif feature_type == "mfcc":
