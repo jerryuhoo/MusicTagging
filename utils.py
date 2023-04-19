@@ -160,41 +160,26 @@ def get_auc(y_true, y_score):
 
 
 def get_model(config):
-    if config["model"]["name"] == "FCN":
-        return FCN(
-            sample_rate=config["model"]["sample_rate"],
-            n_fft=config["model"]["n_fft"],
-            f_min=config["model"]["f_min"],
-            f_max=config["model"]["f_max"],
-            n_mels=config["model"]["n_mels"],
-            n_class=config["dataset"]["num_classes"],
-        )
-    elif config["model"]["name"] == "CRNN":
-        return CRNN(
-            sample_rate=config["model"]["sample_rate"],
-            n_fft=config["model"]["n_fft"],
-            f_min=config["model"]["f_min"],
-            f_max=config["model"]["f_max"],
-            n_mels=config["model"]["n_mels"],
-            n_class=config["dataset"]["num_classes"],
-        )
-    elif config["model"]["name"] == "HarmonicCNN":
-        return HarmonicCNN(
-            sample_rate=config["model"]["sample_rate"],
-            n_fft=config["model"]["n_fft"],
-            f_min=config["model"]["f_min"],
-            f_max=config["model"]["f_max"],
-            n_mels=config["model"]["n_mels"],
-            n_class=config["dataset"]["num_classes"],
-        )
-    elif config["model"]["name"] == "ShortChunkCNN":
-        return ShortChunkCNN(
-            sample_rate=config["model"]["sample_rate"],
-            n_fft=config["model"]["n_fft"],
-            f_min=config["model"]["f_min"],
-            f_max=config["model"]["f_max"],
-            n_mels=config["model"]["n_mels"],
-            n_class=config["dataset"]["num_classes"],
-        )
-    else:
-        raise ValueError("Unknown model name: {}".format(config["model"]["name"]))
+    model_name = config["model"]["name"]
+
+    model_class_map = {
+        "FCN": FCN,
+        "CRNN": CRNN,
+        "HarmonicCNN": HarmonicCNN,
+        "ShortChunkCNN": ShortChunkCNN,
+    }
+
+    if model_name not in model_class_map:
+        raise ValueError(f"Unknown model name: {model_name}")
+
+    model_class = model_class_map[model_name]
+
+    return model_class(
+        sample_rate=config["model"]["sample_rate"],
+        n_fft=config["model"]["n_fft"],
+        f_min=config["model"]["f_min"],
+        f_max=config["model"]["f_max"],
+        n_mels=config["model"]["n_mels"],
+        n_class=config["dataset"]["num_classes"],
+        feature_type=config["feature_type"],
+    )

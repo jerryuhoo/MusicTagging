@@ -90,6 +90,11 @@ if feature_type == "log_mel":
     train_feature_h5_path = preprocessed_path + "training" + "/log_mel.h5"
     val_feature_h5_path = preprocessed_path + "validation" + "/log_mel.h5"
     test_feature_h5_path = preprocessed_path + "testing" + "/log_mel.h5"
+if feature_type == "wav":
+    input_dim = 1
+    train_feature_h5_path = preprocessed_path + "training" + "/wav.h5"
+    val_feature_h5_path = preprocessed_path + "validation" + "/wav.h5"
+    test_feature_h5_path = preprocessed_path + "testing" + "/wav.h5"
 
 train_label_h5_path = preprocessed_path + "training" + "/label.h5"
 val_label_h5_path = preprocessed_path + "validation" + "/label.h5"
@@ -202,6 +207,21 @@ model, optimizer, start_epoch, loss = resume_training(model, optimizer, last_mod
 writer = SummaryWriter(log_dir=model_path)
 # writer_eval = SummaryWriter(log_dir=os.path.join(model_path, "eval"))
 
+
+def init_weights(m):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        nn.init.xavier_normal_(m.weight)
+        nn.init.constant_(m.bias, 0)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
+        nn.init.constant_(m.running_mean, 0)
+        nn.init.constant_(m.running_var, 1)
+
+
+torch.manual_seed(1234)
+model.apply(init_weights)
+
 # Train the model
 for epoch in range(start_epoch, num_epochs):
     training_loss = 0.0
@@ -212,7 +232,7 @@ for epoch in range(start_epoch, num_epochs):
         inputs, labels = data
         inputs = inputs.to(device)
         labels = labels.to(device).float()
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         outputs = model(inputs)
         if loss_type == "weightedBCE":
             if config["loss"]["weight"] == "fixed":
@@ -257,6 +277,7 @@ for epoch in range(start_epoch, num_epochs):
             loss = weighted_bce_global_class_weights_loss(outputs, labels)
         elif loss_type == "BCE":
             loss = bce_loss(outputs, labels)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         training_loss += loss.item()
@@ -356,7 +377,6 @@ for epoch in range(start_epoch, num_epochs):
                 )
                 confusion_matrix += batch_confusion_matrix
                 val_outputs = val_outputs.detach().cpu().numpy()
-                val_outputs = (val_outputs >= 0.5).astype(int)
                 output_array = np.concatenate((output_array, val_outputs))
                 label_array = np.concatenate(
                     (label_array, val_labels.detach().cpu().numpy())

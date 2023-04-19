@@ -49,6 +49,7 @@ if stage <= 1:
             step_len=30,
             total_len=total_len,
             sample_rate=sample_rate,
+            feature_type="log_mel",
         )
     else:
         preprocess_data(
@@ -68,29 +69,32 @@ if stage <= 2:
             save_dir + folder + "/mfcc"
         ):
             print("creating " + folder + "/mfcc.h5")
-            create_hdf5_dataset(
-                save_dir + folder + "/mfcc", save_dir + folder, "mfcc", 50000
-            )
+            create_hdf5_dataset(save_dir + folder + "/mfcc", save_dir + folder, "mfcc")
         if not os.path.exists(save_dir + folder + "/mfcc_mean.h5") and os.path.exists(
             save_dir + folder + "/mfcc_mean"
         ):
             print("creating " + folder + "/mfcc_mean.h5")
             create_hdf5_dataset(
-                save_dir + folder + "/mfcc_mean", save_dir + folder, "mfcc_mean", 50000
+                save_dir + folder + "/mfcc_mean", save_dir + folder, "mfcc_mean"
             )
         if not os.path.exists(save_dir + folder + "/log_mel.h5") and os.path.exists(
             save_dir + folder + "/log_mel"
         ):
             print("creating " + folder + "/log_mel.h5")
             create_hdf5_dataset(
-                save_dir + folder + "/log_mel", save_dir + folder, "log_mel", 10000
+                save_dir + folder + "/log_mel", save_dir + folder, "log_mel"
             )
+        if not os.path.exists(save_dir + folder + "/wav.h5") and os.path.exists(
+            save_dir + folder + "/wav"
+        ):
+            print("creating " + folder + "/wav.h5")
+            create_hdf5_dataset(save_dir + folder + "/wav", save_dir + folder, "wav")
         if not os.path.exists(save_dir + folder + "/label.h5") and os.path.exists(
             save_dir + folder + "/label"
         ):
             print("creating " + folder + "/label.h5")
             create_hdf5_dataset(
-                save_dir + folder + "/label", save_dir + folder, "label", 50000
+                save_dir + folder + "/label", save_dir + folder, "label"
             )
 
 if delete_npy:

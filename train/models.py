@@ -208,9 +208,9 @@ class FCN(nn.Module):
         f_max=8000.0,
         n_mels=96,
         n_class=50,
+        feature_type="log_mel",
     ):
         super(FCN, self).__init__()
-
         # Spectrogram
         self.spec = torchaudio.transforms.MelSpectrogram(
             sample_rate=sample_rate,
@@ -221,6 +221,7 @@ class FCN(nn.Module):
         )
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
+        self.feature_type = feature_type
 
         # # FCN short
         # self.layer1 = Conv_2d(1, 64, pooling=(2, 2))
@@ -241,27 +242,18 @@ class FCN(nn.Module):
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
-        # Spectrogram
-        # print(x.shape)
-        # x = self.to_db(x)
-        # print(x.shape)
+        if self.feature_type == "wav":
+            # Spectrogram
+            x = self.spec(x)
+            x = self.to_db(x)
         x = x.unsqueeze(1)
-        # print(x.shape)
         x = self.spec_bn(x)
-        # print(x.shape)
-        # print("===")
         # FCN
         x = self.layer1(x)
-        # print(x.shape)
         x = self.layer2(x)
-        # print(x.shape)
         x = self.layer3(x)
-        # print(x.shape)
         x = self.layer4(x)
-        # print(x.shape)
         x = self.layer5(x)
-        # print(x.shape)
-        # print("===")
 
         # Dense
         x = x.view(x.size(0), -1)

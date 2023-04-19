@@ -144,7 +144,17 @@ def preprocess_segment(args):
 
 
 def process_song(args):
-    row_idx, mp3_path, label, total_len, win_len, step_len, save_dir, sr = args
+    (
+        row_idx,
+        mp3_path,
+        label,
+        total_len,
+        win_len,
+        step_len,
+        save_dir,
+        sr,
+        feature_type,
+    ) = args
     y, _ = librosa.load(mp3_path, sr=sr)
     padded_y = np.pad(y, (0, total_len * sr - len(y)), "constant")
     num_segments = (len(padded_y) - win_len * sr) // (step_len * sr) + 1
@@ -153,12 +163,30 @@ def process_song(args):
         start = seg_idx * step_len * sr
         end = start + win_len * sr
         segment = padded_y[start:end]
-
-        log_mel_spec = extract_log_mel(segment, sr)
-        np.save(
-            os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"),
-            log_mel_spec,
-        )
+        if feature_type == "log_mel":
+            log_mel_spec = extract_log_mel(segment, sr)
+            np.save(
+                os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"),
+                log_mel_spec,
+            )
+        elif feature_type == "mfcc":
+            mfcc = extract_mfcc(segment, sr)
+            np.save(
+                os.path.join(save_dir, "mfcc", f"mfcc_{row_idx}_{seg_idx}.npy"), mfcc
+            )
+        elif feature_type == "mfcc_mean":
+            mfcc_mean = extract_mfcc_mean(segment, sr)
+            np.save(
+                os.path.join(
+                    save_dir, "mfcc_mean", f"mfcc_mean_{row_idx}_{seg_idx}.npy"
+                ),
+                mfcc_mean,
+            )
+        elif feature_type == "wav":
+            np.save(
+                os.path.join(save_dir, "wav", f"wav_{row_idx}_{seg_idx}.npy"),
+                segment,
+            )
         np.save(
             os.path.join(save_dir, "label", f"label_{row_idx}_{seg_idx}.npy"), label
         )
@@ -174,11 +202,13 @@ def process_directory(
     win_len,
     step_len,
     sample_rate,
+    feature_type,
 ):
     data = np.load(data_dir)
     total_length = len(data)
 
     os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
+    os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
 
     with multiprocessing.Pool(n_workers) as pool:
@@ -201,6 +231,7 @@ def process_directory(
                 step_len,
                 save_dir,
                 sample_rate,
+                feature_type,
             )
             for row_idx, (mp3_path, label) in enumerate(zip(mp3_paths, labels))
         ]
@@ -227,6 +258,7 @@ def preprocess_data_sota(
     step_len=30,
     total_len=30,
     sample_rate=16000,
+    feature_type="log_mel",
 ):
     os.makedirs(os.path.join(save_base_dir, "training"), exist_ok=True)
     os.makedirs(os.path.join(save_base_dir, "validation"), exist_ok=True)
@@ -245,6 +277,7 @@ def preprocess_data_sota(
         win_len,
         step_len,
         sample_rate,
+        feature_type,
     )
     process_directory(
         valid_dir,
@@ -256,6 +289,7 @@ def preprocess_data_sota(
         win_len,
         step_len,
         sample_rate,
+        feature_type,
     )
     process_directory(
         test_dir,
@@ -267,6 +301,7 @@ def preprocess_data_sota(
         win_len,
         step_len,
         sample_rate,
+        feature_type,
     )
 
 
@@ -392,7 +427,7 @@ def preprocess_data(
     print("done")
 
 
-def create_hdf5_dataset(data_dir, save_dir, dataset_name, batch_size):
+def create_hdf5_dataset(data_dir, save_dir, dataset_name):
     # Get a list of filenames sorted alphabetically
     filenames = sorted(os.listdir(data_dir))
 
@@ -405,12 +440,8 @@ def create_hdf5_dataset(data_dir, save_dir, dataset_name, batch_size):
         dataset = f.create_dataset(dataset_name, shape=dataset_shape, dtype="float32")
 
         # Iterate over the files and add the data to the dataset
-        for i in range(0, len(filenames), batch_size):
-            batch_filenames = filenames[i : i + batch_size]
-            batch_data = [
-                np.load(os.path.join(data_dir, filename))
-                for filename in tqdm(batch_filenames)
-            ]
-            dataset[i : i + len(batch_data)] = batch_data
+        for i, filename in enumerate(tqdm(filenames)):
+            data = np.load(os.path.join(data_dir, filename))
+            dataset[i] = data
 
     return dataset_shape
