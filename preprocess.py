@@ -25,7 +25,7 @@ if stage == 0:
 
 song_dir = "../data/magnatagatune/mp3/"
 csv_dir = "../data/magnatagatune/annotations_final_new.csv"
-save_dir = "preprocessed/" + str(total_len) + "/"
+save_dir = "preprocessed/" + str(win_len) + "/"
 os.makedirs(save_dir, exist_ok=True)
 
 binary_dir = "../sota-music-tagging-models/split/mtat/binary.npy"
