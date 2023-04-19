@@ -8,8 +8,8 @@ import os
 
 # config
 total_len = 30
-delete_npy = False
-stage = 1
+delete_npy = True
+stage = 2
 use_sota_data = False
 sample_rate = 16000
 feature_type = "wav"
@@ -100,12 +100,11 @@ if stage <= 2:
                 save_dir + folder + "/label", save_dir + folder, "label"
             )
 
-if delete_npy:
-    # delete folders that contains npy files
-    print("deleting npy files")
-    for folder in ["training", "validation", "testing"]:
-        for subfolder in ["mfcc", "mfcc_mean", "label", "log_mel"]:
-            os.system("rm -rf " + save_dir + folder + "/" + subfolder)
+        if delete_npy:
+            # delete folders that contains npy files
+            print("deleting npy files")
+            for subfolder in ["mfcc", "mfcc_mean", "label", "log_mel"]:
+                os.system("rm -rf " + save_dir + folder + "/" + subfolder)
 
 
 print("done")
