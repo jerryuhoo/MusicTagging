@@ -60,9 +60,7 @@ def process_song(args):
             if feature_type == "log_mel":
                 log_mel_spec = extract_log_mel(segment, sr)
                 np.save(
-                    os.path.join(
-                        save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"
-                    ),
+                    os.path.join(save_dir, "log_mel", f"log_mel_{row_idx}_{seg_idx}.npy"),
                     log_mel_spec,
                 )
             elif feature_type == "mfcc":
@@ -88,7 +86,7 @@ def process_song(args):
                 os.path.join(save_dir, "label", f"label_{row_idx}_{seg_idx}.npy"), label
             )
     except Exception:
-        print("error: {}".format(mp3_path))
+        print("error1: {}".format(mp3_path))
 
 
 def process_directory(
@@ -106,8 +104,16 @@ def process_directory(
     data = np.load(data_dir)
     total_length = len(data)
 
-    os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
+    if feature_type == "mfcc":
+        os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
+    elif feature_type == "mfcc_mean":
+        os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
+    elif feature_type == "log_mel":
+        os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
+    elif feature_type == "wav":
+        os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
+    else:
+        raise ValueError("Invalid feature type")
     os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
 
     with multiprocessing.Pool(n_workers) as pool:
@@ -243,10 +249,14 @@ def preprocess_data(
 
             if feature_type == "mfcc":
                 os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
-            if feature_type == "mfcc_mean":
+            elif feature_type == "mfcc_mean":
                 os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
-            if feature_type == "log_mel":
+            elif feature_type == "log_mel":
                 os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
+            elif feature_type == "wav":
+                os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
+            else:
+                raise ValueError("Invalid feature type")
             os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
 
             audio_path = (
@@ -269,7 +279,7 @@ def preprocess_data(
             )
         except Exception:
             audio_path = os.path.join(song_dir, row["mp3_path"])[:-4] + ".mp3"
-            print("error: {}".format(audio_path))
+            print("error2: {}".format(audio_path))
 
     with tqdm(total=len(args_list)) as pbar:
         for _ in pool.imap_unordered(process_song, args_list):

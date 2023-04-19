@@ -12,6 +12,7 @@ delete_npy = False
 stage = 1
 use_sota_data = False
 sample_rate = 16000
+feature_type = "wav"
 
 # clean the dataset
 if stage == 0:
@@ -49,7 +50,7 @@ if stage <= 1:
             step_len=30,
             total_len=total_len,
             sample_rate=sample_rate,
-            feature_type="log_mel",
+            feature_type=feature_type,
         )
     else:
         preprocess_data(
@@ -61,7 +62,7 @@ if stage <= 1:
             step_len=30,
             total_len=total_len,
             sample_rate=sample_rate,
-            feature_type="log_mel",
+            feature_type=feature_type,
         )
 
 if stage <= 2:
