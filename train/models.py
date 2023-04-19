@@ -6,8 +6,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-
+import librosa
 import sys
+import numpy as np
 
 sys.path.append(".")
 from modules import (
@@ -209,6 +210,9 @@ class FCN(nn.Module):
         n_mels=96,
         n_class=50,
         feature_type="log_mel",
+        hop_length=256,
+        bins_per_octave=12,
+        n_bins=84,
     ):
         super(FCN, self).__init__()
         # Spectrogram
@@ -222,6 +226,11 @@ class FCN(nn.Module):
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
         self.feature_type = feature_type
+        self.sample_rate = sample_rate
+        self.hop_length = hop_length
+        self.bins_per_octave = bins_per_octave
+        self.n_bins = n_bins
+        self.feature_extraction = "concat"
 
         # # FCN short
         # self.layer1 = Conv_2d(1, 64, pooling=(2, 2))
@@ -238,15 +247,42 @@ class FCN(nn.Module):
         self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
 
         # Dense
-        self.dense = nn.Linear(64, n_class)
+        if self.feature_extraction == "concat":
+            self.dense = nn.Linear(64 * 2, n_class)
+        else:
+            self.dense = nn.Linear(64, n_class)
         self.dropout = nn.Dropout(0.5)
+
+    def cqt_feature(self, x):
+        cqt_list = []
+        for i in range(x.shape[0]):
+            cqt = librosa.cqt(
+                np.asarray(x[i].cpu().squeeze()),
+                sr=self.sample_rate,
+                hop_length=self.hop_length,
+                bins_per_octave=self.bins_per_octave,
+                n_bins=self.n_bins,
+            )
+            cqt_db = librosa.amplitude_to_db(np.abs(cqt), ref=np.max)
+            cqt_db = torch.from_numpy(cqt_db).to(x.device)
+            cqt_list.append(cqt_db.unsqueeze(0))
+        return torch.stack(cqt_list)
 
     def forward(self, x):
         if self.feature_type == "wav":
-            # Spectrogram
-            x = self.spec(x)
-            x = self.to_db(x)
-        x = x.unsqueeze(1)
+            if self.feature_extraction == "log_mel":
+                x = self.spec(x)
+                x = self.to_db(x)
+                x = x.unsqueeze(1)
+            elif self.feature_extraction == "cqt":
+                x = self.cqt_feature(x)
+            elif self.feature_extraction == "concat":
+                x_mel = self.spec(x)
+                x_mel = self.to_db(x_mel)
+                x_mel = x_mel.unsqueeze(1)
+                x_cqt = self.cqt_feature(x)
+                x = torch.cat((x_mel, x_cqt), dim=2)
+
         x = self.spec_bn(x)
         # FCN
         x = self.layer1(x)
