@@ -75,8 +75,8 @@ max_models_saved = config["max_models_saved"]
 save_interval = config["save_interval"]
 num_workers = config["num_workers"]
 csv_dir = config["dataset"]["csv_dir"]
-
 feature_type = config["feature_type"]
+seed = config["seed"]
 
 preprocessed_path = "preprocessed/" + str(feature_length) + "/"
 
@@ -219,7 +219,7 @@ def init_weights(m):
         nn.init.constant_(m.running_var, 1)
 
 
-torch.manual_seed(1234)
+torch.manual_seed(seed)
 model.apply(init_weights)
 
 # Train the model
