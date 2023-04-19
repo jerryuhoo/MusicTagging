@@ -7,14 +7,14 @@ num_epochs: 100
 
 saved_models_count: 0
 max_models_saved: 10
-save_interval: 5
+save_interval: 2
 num_workers: 8
 
 # model architecture
 model:
   name: ShortChunkCNN
   sample_rate: 16000
-  n_fft: 256
+  n_fft: 512
   f_min: 0.0
   f_max: 8000.0
   n_mels: 128
@@ -30,6 +30,8 @@ optimizer:
   name: AdamW
   lr: 0.0001
   weight_decay: 0.0001
+
+seed: 1234
 
 loss:
   type: weightedBCE # BCE / weightedBCE
