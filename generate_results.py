@@ -13,7 +13,7 @@ for model_name in os.listdir(models_path):
 
     # Check if the current path is a directory
     if os.path.isdir(model_dir):
-        best_writer_values_path = os.path.join(model_dir, "best_writer_values.txt")
+        best_writer_values_path = os.path.join(model_dir, "best_writer_values_test.txt")
 
         # Check if the best_writer_values.txt file exists in the current model directory
         if os.path.isfile(best_writer_values_path):

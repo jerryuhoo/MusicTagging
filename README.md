@@ -43,6 +43,10 @@ python train/trainer.py --config="config/config_fcn_logmel_bce.yaml"
 
 ## Inference
 ```bash
-python infer.py --model_folder="models/config_fcn_logmel_bce"
+python infer.py --model_folder="models/"
 ```
 
+## Summary all models
+```bash
+python generate_results.py
+```

@@ -4,7 +4,9 @@ import os
 import fnmatch
 
 
-exclude_list = ["config/config_shortchunkcnn.yaml",]
+exclude_list = [
+    "config_fcn_logmel_bce.yaml",
+]
 
 config_path = "config"
 config_files = [
