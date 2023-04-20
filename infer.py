@@ -97,23 +97,24 @@ with torch.no_grad():
         inputs = inputs.to(device)
         labels = labels.to(device).float()
         outputs = model(inputs)
-    total += labels.numel()
-    correct += (outputs.round() == labels).sum().item()
-    batch_confusion_matrix = compute_confusion_matrix(outputs, labels)
-    confusion_matrix += batch_confusion_matrix
-    outputs = outputs.detach().cpu().numpy()
-    output_array = np.concatenate((output_array, outputs))
-    label_array = np.concatenate((label_array, labels.detach().cpu().numpy()))
-acc = correct / total
-roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
-precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
+        total += labels.numel()
+        correct += (outputs.round() == labels).sum().item()
+        batch_confusion_matrix = compute_confusion_matrix(outputs, labels)
+        confusion_matrix += batch_confusion_matrix
+        outputs = outputs.detach().cpu().numpy()
+        output_array = np.concatenate((output_array, outputs))
+        label_array = np.concatenate((label_array, labels.detach().cpu().numpy()))
+    acc = correct / total
+    roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
+    precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
 
-print("Accuracy: {:.3f}".format(acc))
-print("ROC AUC: {:.3f}".format(roc_auc))
-print("PR AUC: {:.3f}".format(pr_auc))
-print("Precision: {:.3f}".format(precision))
-print("Recall: {:.3f}".format(recall))
-print("F1: {:.3f}".format(f1))
+print("Test results")
+print("Accuracy: {:.4f}".format(acc))
+print("ROC AUC: {:.4f}".format(roc_auc))
+print("PR AUC: {:.4f}".format(pr_auc))
+print("Precision: {:.4f}".format(precision))
+print("Recall: {:.4f}".format(recall))
+print("F1: {:.4f}".format(f1))
 
 # Save the best_writer_values to a text file
 with open(os.path.join(args.model_folder, "best_writer_values_test.txt"), "w") as f:
