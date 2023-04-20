@@ -11,6 +11,7 @@ from utils import (
     log_confusion_matrix,
     get_auc,
     get_model,
+    plot_auc,
 )
 
 device = check_device()
@@ -22,7 +23,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--model_folder",
     type=str,
-    required=True,
+    default="models",
     help="Path to the models folder containing sub-folders for each model",
 )
 args = parser.parse_args()
@@ -112,8 +113,11 @@ for model_folder in model_folders:
             output_array = np.concatenate((output_array, outputs))
             label_array = np.concatenate((label_array, labels.detach().cpu().numpy()))
         acc = correct / total
-        roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
+        y_true = label_array.flatten()
+        y_score = output_array.flatten()
+        roc_auc, pr_auc = get_auc(y_true, y_score)
         precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
+        best_threshold = plot_auc(y_true, y_score, model_folder)
 
     print("Test results")
     print("Accuracy: {:.4f}".format(acc))
@@ -122,6 +126,7 @@ for model_folder in model_folders:
     print("Precision: {:.4f}".format(precision))
     print("Recall: {:.4f}".format(recall))
     print("F1: {:.4f}".format(f1))
+    print("Best Threshold: {:.4f}".format(best_threshold))
 
     # Save the best_writer_values to a text file
     with open(os.path.join(model_folder, "best_writer_values_test.txt"), "w") as f:
@@ -131,3 +136,4 @@ for model_folder in model_folders:
         f.write(f"precision: {precision}\n")
         f.write(f"recall: {recall}\n")
         f.write(f"f1: {f1}\n")
+        f.write(f"best_threshold: {best_threshold}\n")

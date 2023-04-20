@@ -139,6 +139,7 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
 
     print(f"precision: {precision_sum}, recall: {recall_sum}")
     print(f"f1: {f1_sum}")
+    plt.clf()
     return precision_sum, recall_sum, f1_sum
 
 
@@ -157,6 +158,21 @@ def get_auc(y_true, y_score):
     print("roc_auc: %.4f" % roc_aucs)
     print("pr_auc: %.4f" % pr_aucs)
     return roc_aucs, pr_aucs
+
+
+def plot_auc(y_true, y_score, save_path):
+    plt.clf()
+    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_score)
+    idx = np.argmax(tpr - fpr)
+    best_threshold = thresholds[idx]
+    plt.plot(fpr, tpr, label="ROC Curve")
+    plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("Receiver Operating Characteristic (ROC) Curve")
+    plt.legend()
+    plt.savefig(os.path.join(save_path, "roc_curve.png"))
+    return best_threshold
 
 
 def get_model(config):

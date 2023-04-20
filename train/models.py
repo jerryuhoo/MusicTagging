@@ -317,6 +317,10 @@ class ShortChunkCNN(nn.Module):
         f_max=8000.0,
         n_mels=128,
         n_class=50,
+        feature_type="log_mel",
+        hop_length=256,
+        bins_per_octave=12,
+        n_bins=84,
     ):
         super(ShortChunkCNN, self).__init__()
 
