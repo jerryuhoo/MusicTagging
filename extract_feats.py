@@ -57,7 +57,7 @@ def process_song(args):
             start = seg_idx * step_len * sr
             end = start + win_len * sr
             segment = padded_y[start:end]
-            if feature_type == "log_mel":
+            if "log_mel" in feature_type:
                 log_mel_spec = extract_log_mel(segment, sr)
                 np.save(
                     os.path.join(
@@ -65,21 +65,22 @@ def process_song(args):
                     ),
                     log_mel_spec,
                 )
-            elif feature_type == "mfcc":
-                mfcc = extract_mfcc(segment, sr)
+            elif "mfcc" in feature_type:
+                mfcc = extract_mfcc(segment, sr, n_mfcc=25)
                 np.save(
                     os.path.join(save_dir, "mfcc", f"mfcc_{row_idx}_{seg_idx}.npy"),
                     mfcc,
                 )
-            elif feature_type == "mfcc_mean":
-                mfcc_mean = extract_mfcc_mean(segment, sr)
+            elif "mfcc_mean" in feature_type:
+                mfcc = extract_mfcc(segment, sr, n_mfcc=25)
+                mfcc_mean = extract_mfcc_mean(mfcc)
                 np.save(
                     os.path.join(
                         save_dir, "mfcc_mean", f"mfcc_mean_{row_idx}_{seg_idx}.npy"
                     ),
                     mfcc_mean,
                 )
-            elif feature_type == "wav":
+            elif "wav" in feature_type:
                 np.save(
                     os.path.join(save_dir, "wav", f"wav_{row_idx}_{seg_idx}.npy"),
                     segment,
@@ -105,14 +106,15 @@ def process_directory(
 ):
     data = np.load(data_dir)
     total_length = len(data)
-
-    if feature_type == "mfcc":
+    print("feature_type: {}".format(feature_type))
+    if "mfcc" in feature_type:
         os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
-    elif feature_type == "mfcc_mean":
+    elif "mfcc_mean" in feature_type:
         os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
-    elif feature_type == "log_mel":
+    elif "log_mel" in feature_type:
         os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
-    elif feature_type == "wav":
+        print("aaaaaaaaaa")
+    elif "wav" in feature_type:
         os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
     else:
         raise ValueError("Invalid feature type")
@@ -165,7 +167,7 @@ def preprocess_data_sota(
     step_len=30,
     total_len=30,
     sample_rate=16000,
-    feature_type="log_mel",
+    feature_type=["log_mel"],
 ):
     os.makedirs(os.path.join(save_base_dir, "training"), exist_ok=True)
     os.makedirs(os.path.join(save_base_dir, "validation"), exist_ok=True)
@@ -221,12 +223,23 @@ def preprocess_data(
     step_len=5,
     total_len=30,
     sample_rate=16000,
-    feature_type="log_mel",
+    feature_type=["log_mel"],
 ):
     os.makedirs(os.path.join(save_base_dir, "training"), exist_ok=True)
     os.makedirs(os.path.join(save_base_dir, "validation"), exist_ok=True)
     os.makedirs(os.path.join(save_base_dir, "testing"), exist_ok=True)
 
+    for feature in feature_type:
+        os.makedirs(os.path.join(save_base_dir, "training", feature), exist_ok=True)
+        os.makedirs(os.path.join(save_base_dir, "validation", feature), exist_ok=True)
+        os.makedirs(os.path.join(save_base_dir, "testing", feature), exist_ok=True)
+
+    for save_dir in [
+        os.path.join(save_base_dir, "training"),
+        os.path.join(save_base_dir, "validation"),
+        os.path.join(save_base_dir, "testing"),
+    ]:
+        os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
     total_length = total_len * sample_rate
     window_length = win_len * sample_rate
     step = step_len * sample_rate
@@ -248,18 +261,6 @@ def preprocess_data(
                 save_dir = os.path.join(save_base_dir, "testing")
             else:
                 continue
-
-            if feature_type == "mfcc":
-                os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
-            elif feature_type == "mfcc_mean":
-                os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
-            elif feature_type == "log_mel":
-                os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
-            elif feature_type == "wav":
-                os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
-            else:
-                raise ValueError("Invalid feature type")
-            os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
 
             audio_path = (
                 os.path.splitext(os.path.join(song_dir, row["mp3_path"]))[0] + ".mp3"

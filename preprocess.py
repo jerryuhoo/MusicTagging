@@ -14,7 +14,7 @@ delete_npy = True
 stage = 1
 use_sota_data = False
 sample_rate = 16000
-feature_type = "wav"
+feature_type = ["wav", "mfcc", "log_mel"]
 
 # clean the dataset
 if stage == 0:
