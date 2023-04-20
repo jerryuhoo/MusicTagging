@@ -102,7 +102,6 @@ with torch.no_grad():
     batch_confusion_matrix = compute_confusion_matrix(outputs, labels)
     confusion_matrix += batch_confusion_matrix
     outputs = outputs.detach().cpu().numpy()
-    outputs = (outputs >= 0.5).astype(int)
     output_array = np.concatenate((output_array, outputs))
     label_array = np.concatenate((label_array, labels.detach().cpu().numpy()))
 acc = correct / total

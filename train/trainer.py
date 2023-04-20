@@ -51,7 +51,7 @@ parser.add_argument(
 parser.add_argument(
     "--patience",
     type=int,
-    default=5,
+    default=3,
     help="Number of epochs to wait before early stopping.",
 )
 args = parser.parse_args()
