@@ -247,7 +247,7 @@ class FCN(nn.Module):
         self.layer5 = Conv_2d(128, 64, pooling=(4, 4))
 
         # Dense
-        if self.feature_extraction == "concat":
+        if self.feature_extraction == "concat" and self.feature_type == "wav":
             self.dense = nn.Linear(64 * 2, n_class)
         else:
             self.dense = nn.Linear(64, n_class)
@@ -282,7 +282,8 @@ class FCN(nn.Module):
                 x_mel = x_mel.unsqueeze(1)
                 x_cqt = self.cqt_feature(x)
                 x = torch.cat((x_mel, x_cqt), dim=2)
-
+        else:
+            x = x.unsqueeze(1)
         x = self.spec_bn(x)
         # FCN
         x = self.layer1(x)

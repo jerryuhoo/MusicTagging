@@ -25,7 +25,7 @@ class HDF5Dataset(Dataset):
 
 
 class HDF5DataLoader(DataLoader):
-    def __init__(self, train_dataset, batch_size, shuffle=False, num_workers=0):
+    def __init__(self, train_dataset, batch_size, shuffle=True, num_workers=0):
         self.dataset = train_dataset
         super().__init__(
             self.dataset,

@@ -65,13 +65,13 @@ def process_song(args):
                     ),
                     log_mel_spec,
                 )
-            elif "mfcc" in feature_type:
+            if "mfcc" in feature_type:
                 mfcc = extract_mfcc(segment, sr, n_mfcc=25)
                 np.save(
                     os.path.join(save_dir, "mfcc", f"mfcc_{row_idx}_{seg_idx}.npy"),
                     mfcc,
                 )
-            elif "mfcc_mean" in feature_type:
+            if "mfcc_mean" in feature_type:
                 mfcc = extract_mfcc(segment, sr, n_mfcc=25)
                 mfcc_mean = extract_mfcc_mean(mfcc)
                 np.save(
@@ -80,7 +80,7 @@ def process_song(args):
                     ),
                     mfcc_mean,
                 )
-            elif "wav" in feature_type:
+            if "wav" in feature_type:
                 np.save(
                     os.path.join(save_dir, "wav", f"wav_{row_idx}_{seg_idx}.npy"),
                     segment,
@@ -109,15 +109,14 @@ def process_directory(
     print("feature_type: {}".format(feature_type))
     if "mfcc" in feature_type:
         os.makedirs(os.path.join(save_dir, "mfcc"), exist_ok=True)
-    elif "mfcc_mean" in feature_type:
+    if "mfcc_mean" in feature_type:
         os.makedirs(os.path.join(save_dir, "mfcc_mean"), exist_ok=True)
-    elif "log_mel" in feature_type:
+    if "log_mel" in feature_type:
         os.makedirs(os.path.join(save_dir, "log_mel"), exist_ok=True)
         print("aaaaaaaaaa")
-    elif "wav" in feature_type:
+    if "wav" in feature_type:
         os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
-    else:
-        raise ValueError("Invalid feature type")
+
     os.makedirs(os.path.join(save_dir, "label"), exist_ok=True)
 
     with multiprocessing.Pool(n_workers) as pool:
