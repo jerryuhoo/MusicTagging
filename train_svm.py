@@ -13,8 +13,9 @@ from imblearn.under_sampling import RandomUnderSampler
 import h5py
 
 # hyper parameters
-n_components = 25
+n_components = 10
 plot_graph = False
+use_balanced_sample = True
 
 with h5py.File("preprocessed/10/training/mfcc.h5", "r") as f:
     X_train = f["mfcc"][:]
@@ -69,15 +70,19 @@ for label_index in range(0, n_cols):
     print("now training:", current_label)
 
     # Initialize the sampler
-    print("under sample:")
-    sampler = RandomUnderSampler(sampling_strategy="majority")
+    if use_balanced_sample:
+        print("under sample:")
+        sampler = RandomUnderSampler(sampling_strategy="majority")
 
-    # Fit and apply the sampler to your data
-    X_resampled, y_resampled = sampler.fit_resample(X_train, y_train_one_label)
+        # Fit and apply the sampler to your data
+        X_resampled, y_resampled = sampler.fit_resample(X_train, y_train_one_label)
 
-    # X_test_resampled, y_test_one_label_resampled = sampler.fit_resample(
-    #     X_test, y_test_one_label
-    # )
+        # X_test_resampled, y_test_one_label_resampled = sampler.fit_resample(
+        #     X_test, y_test_one_label
+        # )
+    else:
+        X_resampled = X_train
+        y_resampled = y_train_one_label
 
     print("Number of positive labels in training data:", sum(y_train_one_label == 1))
     print("Number of negative labels in training data:", sum(y_train_one_label == 0))
