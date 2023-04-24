@@ -8,21 +8,25 @@ import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
-from imblearn.under_sampling import RandomUnderSampler
 
+from imblearn.under_sampling import RandomUnderSampler
+import h5py
 
 # hyper parameters
 n_components = 25
 plot_graph = False
 
+with h5py.File("preprocessed/10/training/mfcc.h5", "r") as f:
+    X = f["mfcc"][:]
 
-# directory containing all the npy files
-feature_folder = "preprocessed/mfcc"
-label_folder = "preprocessed/label"
-# load mean MFCC feature
-X = np.load("preprocessed/mfcc_svm/mfcc_svm.npy", allow_pickle=True)
-# load y_all
-y_all = np.load(os.path.join(label_folder, "label.npy"), allow_pickle=True)
+with h5py.File("preprocessed/10/training/label.h5", "r") as f:
+    y = f["label"][:]
+
+X = np.array(X)
+X = np.mean(X, axis=-1)
+y_all = np.array(y)
+print(X.shape)
+print(y_all.shape)
 
 assert X.shape[0] == y_all.shape[0]
 
