@@ -60,8 +60,8 @@ def check_device():
     return device
 
 
-def compute_confusion_matrix(y_pred, y_true):
-    y_pred = y_pred.round()
+def compute_confusion_matrix(y_pred, y_true, threshold=0.5):
+    y_pred = y_pred > threshold
     tp = (y_pred * y_true).sum(dim=0)
     fp = ((1 - y_true) * y_pred).sum(dim=0)
     fn = (y_true * (1 - y_pred)).sum(dim=0)
