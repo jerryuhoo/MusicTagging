@@ -15,27 +15,35 @@ import h5py
 # hyper parameters
 use_pca = False
 n_components = 10
+use_feature = "log_mel_mean"  # "mfcc"
+audio_len = 10
 plot_graph = False
 use_balanced_sample = True
 
-with h5py.File("preprocessed/10/training/mfcc.h5", "r") as f:
-    X_train = f["mfcc"][:]
+with h5py.File(
+    "preprocessed/" + str(audio_len) + "/training/" + use_feature + ".h5", "r"
+) as f:
+    X_train = f[use_feature][:]
 
-with h5py.File("preprocessed/10/training/label.h5", "r") as f:
+with h5py.File("preprocessed/" + str(audio_len) + "/training/label.h5", "r") as f:
     y_train = f["label"][:]
 
-with h5py.File("preprocessed/10/testing/mfcc.h5", "r") as f:
-    X_test = f["mfcc"][:]
+with h5py.File(
+    "preprocessed/" + str(audio_len) + "/testing/" + use_feature + ".h5", "r"
+) as f:
+    X_test = f[use_feature][:]
 
-with h5py.File("preprocessed/10/testing/label.h5", "r") as f:
+with h5py.File("preprocessed/" + str(audio_len) + "/testing/label.h5", "r") as f:
     y_test = f["label"][:]
 
 X_train = np.array(X_train)
-X_train = np.mean(X_train, axis=-1)
+if use_feature == "mfcc":
+    X_train = np.mean(X_train, axis=-1)
 y_train = np.array(y_train)
 
 X_test = np.array(X_test)
-X_test = np.mean(X_test, axis=-1)
+if use_feature == "mfcc":
+    X_test = np.mean(X_test, axis=-1)
 y_test = np.array(y_test)
 print(X_train.shape)
 print(y_train.shape)
