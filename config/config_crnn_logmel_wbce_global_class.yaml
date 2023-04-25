@@ -12,7 +12,7 @@ num_workers: 8
 
 # model architecture
 model:
-  name: FCN
+  name: CRNN
   sample_rate: 16000
   n_fft: 512
   f_min: 0.0
@@ -35,7 +35,7 @@ seed: 1234
 
 loss:
   type: weightedBCE # BCE / weightedBCE
-  weight: combined2 # fixed / balanced_cls / balanced_pn / balanced_pn_cls
+  weight: global_class # fixed / batch_pn / global_class / combined1
 # trainer
 # trainer:
 #   gpus: 1

@@ -16,7 +16,7 @@ import h5py
 use_pca = False
 n_components = 10
 use_feature = "log_mel_mean"  # "mfcc"
-audio_len = 10
+audio_len = 30
 plot_graph = False
 use_balanced_sample = True
 
@@ -181,11 +181,24 @@ mean_f1 = np.mean(f1_scores)
 
 average = ["average", mean_accuracy, mean_f1]
 
-with open("list_file_" + str(n_components) + ".txt", "w") as file:
-    for row in results:
+sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
+
+with open(
+    "list_file_"
+    + "PCA_"
+    + str(use_pca)
+    + "_"
+    + str(use_feature)
+    + "_"
+    + str(audio_len)
+    + "s"
+    + ".txt",
+    "w",
+) as file:
+    for row in sorted_results:
         print(row)
-        file.write(str(row) + "\n")
-    file.write(str(average) + "\n")
+        file.write(str(row[0]) + ": " + str(row[2]) + "\n")
+    file.write("average f1: " + str(mean_f1) + "\n")
 
 # print the results
 print("Mean accuracy:", mean_accuracy)
