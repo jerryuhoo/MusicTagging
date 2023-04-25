@@ -72,7 +72,14 @@ class CRNN(nn.Module):
     """
 
     def __init__(
-        self, sample_rate=16000, n_fft=512, f_min=20, f_max=8000, n_mels=128, n_class=50
+        self,
+        sample_rate=16000,
+        n_fft=512,
+        f_min=20,
+        f_max=8000,
+        n_mels=128,
+        n_class=50,
+        feature_type="log_mel",
     ):
         super(CRNN, self).__init__()
 

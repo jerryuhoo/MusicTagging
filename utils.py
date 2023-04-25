@@ -51,21 +51,21 @@ def save_checkpoint(model, epoch, model_path, optimizer, loss):
 
 def check_device():
     if torch.cuda.is_available():
-        print("Using GPU for training.")
+        print("Using GPU")
         device = torch.device("cuda")
         torch.backends.cudnn.benchmark = True
     else:
-        print("Using CPU for training.")
+        print("Using CPU")
         device = torch.device("cpu")
     return device
 
 
 def compute_confusion_matrix(y_pred, y_true, threshold=0.5):
-    y_pred = y_pred > threshold
-    tp = (y_pred * y_true).sum(dim=0)
-    fp = ((1 - y_true) * y_pred).sum(dim=0)
-    fn = (y_true * (1 - y_pred)).sum(dim=0)
-    tn = ((1 - y_true) * (1 - y_pred)).sum(dim=0)
+    y_pred = (y_pred > threshold).float()
+    tp = torch.sum(y_pred * y_true, dim=0)
+    fp = torch.sum((1 - y_true) * y_pred, dim=0)
+    fn = torch.sum(y_true * (1 - y_pred), dim=0)
+    tn = torch.sum((1 - y_true) * (1 - y_pred), dim=0)
     return torch.stack([tp, fp, fn, tn], dim=1)
 
 
@@ -165,13 +165,14 @@ def plot_auc(y_true, y_score, save_path):
     fpr, tpr, thresholds = metrics.roc_curve(y_true, y_score)
     idx = np.argmax(tpr - fpr)
     best_threshold = thresholds[idx]
-    plt.plot(fpr, tpr, label="ROC Curve")
-    plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("Receiver Operating Characteristic (ROC) Curve")
-    plt.legend()
-    plt.savefig(os.path.join(save_path, "roc_curve.png"))
+    if save_path is not None:
+        plt.plot(fpr, tpr, label="ROC Curve")
+        plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title("Receiver Operating Characteristic (ROC) Curve")
+        plt.legend()
+        plt.savefig(os.path.join(save_path, "roc_curve.png"))
     return best_threshold
 
 

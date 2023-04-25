@@ -98,26 +98,28 @@ for model_folder in model_folders:
         correct = 0
         total = 0
         confusion_matrix = torch.zeros((num_classes, 4)).to(device)
-        output_array = np.empty((0, 50))
-        label_array = np.empty((0, 50))
+        output_array = torch.empty((0, 50)).to(device)
+        label_array = torch.empty((0, 50)).to(device)
         for data in tqdm(test_loader):
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device).float()
             outputs = model(inputs)
             total += labels.numel()
-            correct += (outputs.round() == labels).sum().item()
-            batch_confusion_matrix = compute_confusion_matrix(outputs, labels)
-            confusion_matrix += batch_confusion_matrix
-            outputs = outputs.detach().cpu().numpy()
-            output_array = np.concatenate((output_array, outputs))
-            label_array = np.concatenate((label_array, labels.detach().cpu().numpy()))
-        acc = correct / total
+            output_array = torch.cat((output_array, outputs))
+            label_array = torch.cat((label_array, labels))
         y_true = label_array.flatten()
         y_score = output_array.flatten()
-        roc_auc, pr_auc = get_auc(y_true, y_score)
+        best_threshold = plot_auc(
+            y_true.cpu().numpy(), y_score.cpu().numpy(), model_folder
+        )
+        roc_auc, pr_auc = get_auc(y_true.cpu().numpy(), y_score.cpu().numpy())
+        confusion_matrix = compute_confusion_matrix(
+            output_array, label_array, best_threshold
+        )
+        correct = confusion_matrix[:, 0].sum()
+        acc = correct / total
         precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
-        best_threshold = plot_auc(y_true, y_score, model_folder)
 
     print("Test results")
     print("Accuracy: {:.4f}".format(acc))

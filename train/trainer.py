@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import numpy as np
-from torch.utils.data import DataLoader, random_split
 import os
 import shutil
 import time
@@ -11,7 +8,6 @@ from dataset import HDF5Dataset, HDF5DataLoader
 
 # from models import CRNN, HarmonicCNN, FCN, ShortChunkCNN
 from tqdm import tqdm
-from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
 import argparse
 import yaml
@@ -28,6 +24,7 @@ from utils import (
     log_confusion_matrix,
     get_auc,
     get_model,
+    plot_auc,
 )
 
 
@@ -299,8 +296,8 @@ for epoch in range(start_epoch, num_epochs):
             correct = 0
             total = 0
             confusion_matrix = torch.zeros((num_classes, 4)).to(device)
-            output_array = np.empty((0, 50))
-            label_array = np.empty((0, 50))
+            output_array = torch.empty((0, 50)).to(device)
+            label_array = torch.empty((0, 50)).to(device)
 
             for val_data in val_loader:
                 val_inputs, val_labels = val_data
@@ -371,16 +368,16 @@ for epoch in range(start_epoch, num_epochs):
                     loss = bce_loss(val_outputs, val_labels)
                 val_loss += loss.item()
                 total += val_labels.numel()
-                correct += (val_outputs.round() == val_labels).sum().item()
-                batch_confusion_matrix = compute_confusion_matrix(
-                    val_outputs, val_labels
-                )
-                confusion_matrix += batch_confusion_matrix
-                val_outputs = val_outputs.detach().cpu().numpy()
-                output_array = np.concatenate((output_array, val_outputs))
-                label_array = np.concatenate(
-                    (label_array, val_labels.detach().cpu().numpy())
-                )
+                output_array = torch.cat((output_array, val_outputs))
+                label_array = torch.cat((label_array, val_labels))
+            y_true = label_array.flatten()
+            y_score = output_array.flatten()
+            best_threshold = plot_auc(y_true.cpu().numpy(), y_score.cpu().numpy(), None)
+            roc_auc, pr_auc = get_auc(y_true.cpu().numpy(), y_score.cpu().numpy())
+            confusion_matrix = compute_confusion_matrix(
+                output_array, label_array, best_threshold
+            )
+            correct = confusion_matrix[:, 0].sum()
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
@@ -396,7 +393,6 @@ for epoch in range(start_epoch, num_epochs):
                 epoch + 1,
                 walltime=time.time(),
             )
-            roc_auc, pr_auc = get_auc(label_array.flatten(), output_array.flatten())
             writer.add_scalar(f"val/roc_auc", roc_auc, epoch + 1)
             writer.add_scalar(f"val/pr_auc", pr_auc, epoch + 1)
             precision, recall, f1 = log_confusion_matrix(
