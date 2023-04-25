@@ -13,6 +13,7 @@ from imblearn.under_sampling import RandomUnderSampler
 import h5py
 
 # hyper parameters
+use_pca = False
 n_components = 10
 plot_graph = False
 use_balanced_sample = True
@@ -57,9 +58,11 @@ scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-# pca = PCA(n_components=n_components)
-# X = pca.fit_transform(X)
-# print("after PCA", X.shape)
+if use_pca:
+    print("use PCA")
+    pca = PCA(n_components=n_components)
+    X_train = pca.fit_transform(X_train)
+    X_test = pca.transform(X_test)
 
 for label_index in range(0, n_cols):
     print("label_index", label_index)
