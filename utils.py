@@ -70,21 +70,29 @@ def compute_confusion_matrix(y_pred, y_true, threshold=0.5):
 
 
 def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
+    f1_scores = []
     for i in range(confusion_matrix.shape[0]):
-        tp = confusion_matrix[i, 0]
-        fp = confusion_matrix[i, 1]
-        fn = confusion_matrix[i, 2]
-        tn = confusion_matrix[i, 3]
+        tp = confusion_matrix[i, 0].item()
+        fp = confusion_matrix[i, 1].item()
+        fn = confusion_matrix[i, 2].item()
+        tn = confusion_matrix[i, 3].item()
         # print(f"{label_names[i]}/tp:", tp)
         # print(f"{label_names[i]}/predicted positive:", tp + fp)
         # print(f"{label_names[i]}/gt positive:", tp + fn)
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
-        f1 = 2 * precision * recall / (precision + recall)
+        precision = tp / (tp + fp) if tp + fp > 0 else 0
+        recall = tp / (tp + fn) if tp + fn > 0 else 0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if precision + recall > 0
+            else 0
+        )
+        f1_scores.append((i, f1))
         if writer is not None:
             writer.add_scalar(f"class_{i}_{label_names[i]}/precision", precision, epoch)
             writer.add_scalar(f"class_{i}_{label_names[i]}/recall", recall, epoch)
             writer.add_scalar(f"class_{i}_{label_names[i]}/f1", f1, epoch)
+
+    sorted_f1_scores = sorted(f1_scores, key=lambda x: x[1], reverse=True)
 
     tp_sum = torch.sum(confusion_matrix[:, 0], dim=0)
     fp_sum = torch.sum(confusion_matrix[:, 1], dim=0)
@@ -93,29 +101,13 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
     precision_sum = tp_sum / (tp_sum + fp_sum)
     recall_sum = tp_sum / (tp_sum + fn_sum)
     f1_sum = 2 * precision_sum * recall_sum / (precision_sum + recall_sum)
-    # roc_auc = calculate_roc_auc(
-    #     confusion_matrix[:, 0],
-    #     confusion_matrix[:, 1],
-    #     confusion_matrix[:, 2],
-    #     confusion_matrix[:, 3],
-    # )
+
     if writer is not None:
         writer.add_scalar(f"val/precision", precision_sum, epoch)
         writer.add_scalar(f"val/recall", recall_sum, epoch)
         writer.add_scalar(f"val/f1", f1_sum, epoch)
 
     confusion_matrix = confusion_matrix.detach().cpu().numpy()
-    # print("confusion_matrix",confusion_matrix)
-    # fig = plt.figure(figsize=(6, 6))
-    # plt.imshow(confusion_matrix, cmap="Blues")
-    # plt.colorbar()
-    # plt.xlabel('True label ("tp, fp, fn, tn")')
-    # plt.ylabel("Predicted label")
-    # fig.canvas.draw()
-    # image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-    # image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    # image_tensor = torch.from_numpy(image).permute(2, 0, 1)
-    # writer.add_image("Confusion matrix", image_tensor, epoch)
 
     # Calculate normalized confusion matrix
     positive_gt = confusion_matrix[:, 0] + confusion_matrix[:, 2]
@@ -140,7 +132,7 @@ def log_confusion_matrix(writer, confusion_matrix, label_names, epoch):
     print(f"precision: {precision_sum}, recall: {recall_sum}")
     print(f"f1: {f1_sum}")
     plt.clf()
-    return precision_sum, recall_sum, f1_sum
+    return precision_sum, recall_sum, f1_sum, sorted_f1_scores
 
 
 def calculate_roc_auc(tp, fp, fn, tn):

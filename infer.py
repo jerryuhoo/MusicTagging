@@ -1,6 +1,6 @@
 import argparse
 import torch
-import numpy as np
+import pandas as pd
 import os
 import yaml
 from train.dataset import HDF5Dataset, HDF5DataLoader
@@ -34,6 +34,15 @@ model_folders = [
     for folder in os.listdir(args.model_folder)
     if os.path.isdir(os.path.join(args.model_folder, folder))
 ]
+
+# Load labels
+csv_file_path = "../data/magnatagatune/annotations_final_new.csv"
+df = pd.read_csv(csv_file_path, delimiter="\t")
+df = df.drop(df.columns[-2:], axis=1)
+
+# Extract labels from each column and save them into a numpy array
+labels_array = df.columns.values
+print(f"Labels: {labels_array}")
 
 for model_folder in model_folders:
     print(f"Testing model: {os.path.basename(model_folder)}")
@@ -119,7 +128,9 @@ for model_folder in model_folders:
         )
         correct = confusion_matrix[:, 0].sum() + confusion_matrix[:, 3].sum()
         acc = correct / total
-        precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
+        precision, recall, f1, sorted_f1_scores = log_confusion_matrix(
+            None, confusion_matrix, None, None
+        )
 
     print("Test results")
     print("Accuracy: {:.4f}".format(acc))
@@ -129,6 +140,10 @@ for model_folder in model_folders:
     print("Recall: {:.4f}".format(recall))
     print("F1: {:.4f}".format(f1))
     print("Best Threshold: {:.4f}".format(best_threshold))
+
+    print("Sorted labels from the highest to the lowest F1 score:")
+    for idx, f1 in sorted_f1_scores:
+        print(f"Label: {labels_array[idx]}, F1 score: {f1}")
 
     # Save the best_writer_values to a text file
     with open(os.path.join(model_folder, "best_writer_values_test.txt"), "w") as f:
