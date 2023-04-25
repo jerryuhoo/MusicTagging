@@ -377,10 +377,11 @@ for epoch in range(start_epoch, num_epochs):
             confusion_matrix = compute_confusion_matrix(
                 output_array, label_array, best_threshold
             )
-            correct = confusion_matrix[:, 0].sum()
+            correct = confusion_matrix[:, 0].sum() + confusion_matrix[:, 3].sum()
             val_acc = correct / total
             val_loss /= len(val_loader)
             print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
+            print(f"Best Threshold: {best_threshold}")
             writer.add_scalar(
                 "val/Loss",
                 val_loss,
@@ -393,6 +394,7 @@ for epoch in range(start_epoch, num_epochs):
                 epoch + 1,
                 walltime=time.time(),
             )
+            writer.add_scalar(f"val/Best_Threshold", best_threshold, epoch + 1)
             writer.add_scalar(f"val/roc_auc", roc_auc, epoch + 1)
             writer.add_scalar(f"val/pr_auc", pr_auc, epoch + 1)
             precision, recall, f1 = log_confusion_matrix(

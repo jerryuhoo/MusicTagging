@@ -117,7 +117,7 @@ for model_folder in model_folders:
         confusion_matrix = compute_confusion_matrix(
             output_array, label_array, best_threshold
         )
-        correct = confusion_matrix[:, 0].sum()
+        correct = confusion_matrix[:, 0].sum() + confusion_matrix[:, 3].sum()
         acc = correct / total
         precision, recall, f1 = log_confusion_matrix(None, confusion_matrix, None, None)
 
