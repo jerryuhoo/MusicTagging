@@ -397,7 +397,7 @@ for epoch in range(start_epoch, num_epochs):
             writer.add_scalar(f"val/Best_Threshold", best_threshold, epoch + 1)
             writer.add_scalar(f"val/roc_auc", roc_auc, epoch + 1)
             writer.add_scalar(f"val/pr_auc", pr_auc, epoch + 1)
-            precision, recall, f1 = log_confusion_matrix(
+            precision, recall, f1, _ = log_confusion_matrix(
                 writer, confusion_matrix, label_names, epoch + 1
             )
         # save model
