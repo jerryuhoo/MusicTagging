@@ -142,8 +142,10 @@ for model_folder in model_folders:
     print("Best Threshold: {:.4f}".format(best_threshold))
 
     print("Sorted labels from the highest to the lowest F1 score:")
-    for idx, f1 in sorted_f1_scores:
-        print(f"Label: {labels_array[idx]}, F1 score: {f1}")
+    with open(os.path.join(model_folder, "sorted_f1_scores_test.txt"), "w") as f:
+        for idx, f1 in sorted_f1_scores:
+            print(f"Label: {labels_array[idx]}, F1 score: {f1}")
+            f.write(f"Label: {labels_array[idx]}, F1 score: {f1}\n")
 
     # Save the best_writer_values to a text file
     with open(os.path.join(model_folder, "best_writer_values_test.txt"), "w") as f:
@@ -154,3 +156,5 @@ for model_folder in model_folders:
         f.write(f"recall: {recall}\n")
         f.write(f"f1: {f1}\n")
         f.write(f"best_threshold: {best_threshold}\n")
+
+    f.close()
