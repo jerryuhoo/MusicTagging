@@ -20,8 +20,10 @@ class HDF5Dataset(Dataset):
         return self.total_samples
 
     def __del__(self):
-        self.feature_h5.close()
-        self.label_h5.close()
+        if self.feature_h5 is not None:
+            self.feature_h5.close()
+        if self.label_h5 is not None:
+            self.label_h5.close()
 
 
 class HDF5DataLoader(DataLoader):

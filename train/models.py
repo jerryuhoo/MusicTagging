@@ -80,9 +80,18 @@ class CRNN(nn.Module):
         n_mels=128,
         n_class=50,
         feature_type="log_mel",
+        dropout=0.5,
+        feature_extraction="log_mel",
     ):
         super(CRNN, self).__init__()
-
+        if feature_type == "wav":
+            self.spec = torchaudio.transforms.MelSpectrogram(
+                sample_rate=sample_rate,
+                n_fft=n_fft,
+                f_min=f_min,
+                f_max=f_max,
+                n_mels=n_mels,
+            )
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
 
@@ -96,12 +105,43 @@ class CRNN(nn.Module):
         self.layer5 = nn.GRU(128, 32, 2, batch_first=True)
 
         # Dense
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(dropout)
         self.dense = nn.Linear(32, n_class)
 
+        self.feature_type = feature_type
+        self.feature_extraction = feature_extraction
+
+    def cqt_feature(self, x):
+        cqt_list = []
+        for i in range(x.shape[0]):
+            cqt = librosa.cqt(
+                np.asarray(x[i].cpu().squeeze()),
+                sr=self.sample_rate,
+                hop_length=self.hop_length,
+                bins_per_octave=self.bins_per_octave,
+                n_bins=self.n_bins,
+            )
+            cqt_db = librosa.amplitude_to_db(np.abs(cqt), ref=np.max)
+            cqt_db = torch.from_numpy(cqt_db).to(x.device)
+            cqt_list.append(cqt_db.unsqueeze(0))
+        return torch.stack(cqt_list)
+
     def forward(self, x):
-        x = x.unsqueeze(1)
-        # print(x.shape)
+        if self.feature_type == "wav":
+            if self.feature_extraction == "log_mel":
+                x = self.spec(x)
+                x = self.to_db(x)
+                x = x.unsqueeze(1)
+            elif self.feature_extraction == "cqt":
+                x = self.cqt_feature(x)
+            elif self.feature_extraction == "concat":
+                x_mel = self.spec(x)
+                x_mel = self.to_db(x_mel)
+                x_mel = x_mel.unsqueeze(1)
+                x_cqt = self.cqt_feature(x)
+                x = torch.cat((x_mel, x_cqt), dim=2)
+        else:
+            x = x.unsqueeze(1)
 
         # CCN
         x = self.layer1(x)
@@ -142,6 +182,7 @@ class HarmonicCNN(nn.Module):
         n_harmonic=6,
         semitone_scale=2,
         learn_bw="only_Q",
+        dropout=0.5,
     ):
         super(HarmonicCNN, self).__init__()
 
@@ -168,7 +209,7 @@ class HarmonicCNN(nn.Module):
         self.dense1 = nn.Linear(n_channels * 2, n_channels * 2)
         self.bn = nn.BatchNorm1d(n_channels * 2)
         self.dense2 = nn.Linear(n_channels * 2, n_class)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -220,16 +261,19 @@ class FCN(nn.Module):
         hop_length=256,
         bins_per_octave=12,
         n_bins=84,
+        feature_extraction="log_mel",
+        dropout=0.5,
     ):
         super(FCN, self).__init__()
-        # Spectrogram
-        self.spec = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            f_min=f_min,
-            f_max=f_max,
-            n_mels=n_mels,
-        )
+        if feature_type == "wav":
+            # Spectrogram
+            self.spec = torchaudio.transforms.MelSpectrogram(
+                sample_rate=sample_rate,
+                n_fft=n_fft,
+                f_min=f_min,
+                f_max=f_max,
+                n_mels=n_mels,
+            )
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
         self.feature_type = feature_type
@@ -237,7 +281,7 @@ class FCN(nn.Module):
         self.hop_length = hop_length
         self.bins_per_octave = bins_per_octave
         self.n_bins = n_bins
-        self.feature_extraction = "concat"
+        self.feature_extraction = feature_extraction
 
         # # FCN short
         # self.layer1 = Conv_2d(1, 64, pooling=(2, 2))
@@ -258,7 +302,7 @@ class FCN(nn.Module):
             self.dense = nn.Linear(64 * 2, n_class)
         else:
             self.dense = nn.Linear(64, n_class)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(dropout)
 
     def cqt_feature(self, x):
         cqt_list = []
@@ -317,28 +361,31 @@ class ShortChunkCNN(nn.Module):
 
     def __init__(
         self,
-        n_channels=128,
+        n_channels=96,
         sample_rate=16000,
         n_fft=512,
         f_min=0.0,
         f_max=8000.0,
-        n_mels=128,
+        n_mels=96,
         n_class=50,
-        feature_type="log_mel",
+        feature_type="wav",
         hop_length=256,
         bins_per_octave=12,
         n_bins=84,
+        feature_extraction="log_mel",
+        dropout=0.5,
     ):
         super(ShortChunkCNN, self).__init__()
 
-        # Spectrogram
-        self.spec = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            f_min=f_min,
-            f_max=f_max,
-            n_mels=n_mels,
-        )
+        if feature_type == "wav":
+            # Spectrogram
+            self.spec = torchaudio.transforms.MelSpectrogram(
+                sample_rate=sample_rate,
+                n_fft=n_fft,
+                f_min=f_min,
+                f_max=f_max,
+                n_mels=n_mels,
+            )
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
 
@@ -355,18 +402,46 @@ class ShortChunkCNN(nn.Module):
         self.dense1 = nn.Linear(n_channels * 4, n_channels * 4)
         self.bn = nn.BatchNorm1d(n_channels * 4)
         self.dense2 = nn.Linear(n_channels * 4, n_class)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
+        self.feature_type = feature_type
+        self.feature_extraction = feature_extraction
+
+        self.n_bins = n_bins
+
+    def cqt_feature(self, x):
+        cqt_list = []
+        for i in range(x.shape[0]):
+            cqt = librosa.cqt(
+                np.asarray(x[i].cpu().squeeze()),
+                sr=self.sample_rate,
+                hop_length=self.hop_length,
+                bins_per_octave=self.bins_per_octave,
+                n_bins=self.n_bins,
+            )
+            cqt_db = librosa.amplitude_to_db(np.abs(cqt), ref=np.max)
+            cqt_db = torch.from_numpy(cqt_db).to(x.device)
+            cqt_list.append(cqt_db.unsqueeze(0))
+        return torch.stack(cqt_list)
+
     def forward(self, x):
-        # Spectrogram
-        # x = self.spec(x)
-        # print("x11", x)
-        # x = self.to_db(x)
-        # print("x22", x)
-        x = x.unsqueeze(1)
+        if self.feature_type == "wav":
+            if self.feature_extraction == "log_mel":
+                x = self.spec(x)
+                x = self.to_db(x)
+                x = x.unsqueeze(1)
+            elif self.feature_extraction == "cqt":
+                x = self.cqt_feature(x)
+            elif self.feature_extraction == "concat":
+                x_mel = self.spec(x)
+                x_mel = self.to_db(x_mel)
+                x_mel = x_mel.unsqueeze(1)
+                x_cqt = self.cqt_feature(x)
+                x = torch.cat((x_mel, x_cqt), dim=2)
+        else:
+            x = x.unsqueeze(1)
         x = self.spec_bn(x)
-        # print("x33", x)
 
         # CNN
         x = self.layer1(x)

@@ -82,9 +82,12 @@ for model_folder in model_folders:
     if feature_type == "mfcc":
         input_dim = 25
         test_feature_h5_path = preprocessed_path + "testing" + "/mfcc.h5"
-    if feature_type == "log_mel":
-        input_dim = 128
+    elif feature_type == "log_mel":
+        input_dim = config["model"]["n_mels"]
         test_feature_h5_path = preprocessed_path + "testing" + "/log_mel.h5"
+    elif feature_type == "cqt":
+        input_dim = 84
+        test_feature_h5_path = preprocessed_path + "testing" + "/wav.h5"
 
     test_label_h5_path = preprocessed_path + "testing" + "/label.h5"
 

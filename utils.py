@@ -183,6 +183,8 @@ def get_model(config):
 
     model_class = model_class_map[model_name]
 
+    feature_extraction = config["feature_extraction"] if config["feature_type"] == "wav" else None
+
     return model_class(
         sample_rate=config["model"]["sample_rate"],
         n_fft=config["model"]["n_fft"],
@@ -191,4 +193,6 @@ def get_model(config):
         n_mels=config["model"]["n_mels"],
         n_class=config["dataset"]["num_classes"],
         feature_type=config["feature_type"],
+        feature_extraction=feature_extraction,
+        dropout=config["model"]["dropout_rate"],
     )
