@@ -146,9 +146,9 @@ for model_folder in model_folders:
 
     print("Sorted labels from the highest to the lowest F1 score:")
     with open(os.path.join(model_folder, "sorted_f1_scores_test.txt"), "w") as f:
-        for idx, f1 in sorted_f1_scores:
-            print(f"Label: {labels_array[idx]}, F1 score: {f1}")
-            f.write(f"Label: {labels_array[idx]}, F1 score: {f1}\n")
+        for idx, label_f1 in sorted_f1_scores:
+            print(f"Label: {labels_array[idx]}, F1 score: {label_f1}")
+            f.write(f"Label: {labels_array[idx]}, F1 score: {label_f1}\n")
 
     # Save the best_writer_values to a text file
     with open(os.path.join(model_folder, "best_writer_values_test.txt"), "w") as f:
