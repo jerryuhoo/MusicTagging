@@ -3,3 +3,5 @@ preprocessed/
 *.joblib
 *.pyc
 models/
+*.pt
+
