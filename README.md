@@ -3,6 +3,8 @@
 ## Introduction
 General machine learning / deep learning models for music tagging.
 
+[Analysis of Weighted BCE Loss Functions for Music Tagging](Analysis_of_Weighted_BCE_Loss_Functions_for_Music_Tagging.pdf)
+
 Dataset: MagnaTagATune
 
 - [x] SVM
